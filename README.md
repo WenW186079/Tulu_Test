@@ -31,12 +31,17 @@ wandb login
 # Step 1. SFT
 Example:
 - Test: 
-`sh scripts/finetune_with_accelerate_config.sh 1 configs/train_configs/sft/mini.yaml `
+```
+sh scripts/finetune_with_accelerate_config.sh 1 configs/train_configs/sft/mini.yaml
+```
 
 - meta-llama/Llama-3.1-8B :
   - GPU: 3 * A100 PCIe
-  - High memory pressure 
-`sh scripts/finetune_with_accelerate_config.sh 3 configs/train_configs/tulu3/tulu3_sft.yaml`
+  - High memory pressure
+  - Run with loss
+```
+sh scripts/finetune_with_accelerate_config.sh 3 configs/train_configs/tulu3/tulu3_sft.yaml
+```
 
 Hyper parameters:
   - Note that '#####' is used here to mark changes from the original version
@@ -71,12 +76,13 @@ reduce_loss : "sum" ###### default is 'mean'
 # Step 2. DPO
 Example:
 - Test: 
-`sh scripts/dpo_train_with_accelerate_config.sh 1 configs/train_configs/dpo/mini.yaml `
+```sh scripts/dpo_train_with_accelerate_config.sh 1 configs/train_configs/dpo/mini.yaml ```
 
 - 8B :
   - GPU: 3 * A100 PCIe
-  - High memory pressure 
-`sh scripts/dpo_train_with_accelerate_config.sh 3 configs/train_configs/tulu3/tulu3_dpo_8b.yaml`
+  - High memory pressure
+  - Run with loss
+```sh scripts/dpo_train_with_accelerate_config.sh 3 configs/train_configs/tulu3/tulu3_dpo_8b.yaml```
 
 Hyper parameters:
   - Same as the original version
@@ -151,8 +157,8 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
 ```
 
 - 8B
-  - GPU: 7 * A100 PCIe
   - When I use 6 * A100 PCIe, shows high memory pressure, subsequent cache flushes can slow down the training
+  - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow 
 Example:
 ```
 python open_instruct/ppo_vllm_thread_ray_gtrl.py \
@@ -193,6 +199,11 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
 
 ```
 
+
+
 Some bugs will happen if you use lower version GPU, for example:
 - `Bfloat16 is only supported on GPUs with compute capability of at least 8.0. `
 - Stuck somewhere without showing bugs
+
+For 'Evaluation responses not received'
+  - As I see from their code, it's not a bug. They update only few times, so most of them are all 'Evaluation responses not received'. 
