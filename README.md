@@ -158,7 +158,8 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
 
 - 8B
   - When I use 6 * A100 PCIe, shows high memory pressure, subsequent cache flushes can slow down the training
-  - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow  [TODO:make sure it's not stucked?]
+  - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
+  - !!!! [TODO]:make sure it's not stucked? cache problem?
 Example:
 ```
 python open_instruct/ppo_vllm_thread_ray_gtrl.py \
@@ -203,7 +204,7 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
 
 Some bugs will happen if you use lower version GPU, for example:
 - `Bfloat16 is only supported on GPUs with compute capability of at least 8.0. `
-- Stuck somewhere without showing bugs
+- Stuck somewhere without showing bugs, ususally before loss shows
 
 For 'Evaluation responses not received'
   - As I see from their code, it's not a bug. They update only few times, so most of them are all 'Evaluation responses not received'. 
