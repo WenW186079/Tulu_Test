@@ -158,7 +158,7 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
 
 - 8B
   - When I use 6 * A100 PCIe, shows high memory pressure, subsequent cache flushes can slow down the training
-  - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow 
+  - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow  [TODO:make sure it's not stucked?]
 Example:
 ```
 python open_instruct/ppo_vllm_thread_ray_gtrl.py \
