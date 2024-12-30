@@ -207,4 +207,15 @@ Some bugs will happen if you use lower version GPU, for example:
 - Stuck somewhere without showing bugs, ususally before loss shows
 
 For 'Evaluation responses not received'
-  - As I see from their code, it's not a bug. They update only few times, so most of them are all 'Evaluation responses not received'. 
+  - As I see from their code, it's not a bug. They update only few times, so most of them are all 'Evaluation responses not received'.
+
+Cache problem:
+```
+(PolicyTrainerRayProcess pid=9930) Invalidate trace cache @ step 423: expected module 454, but got module 1
+(PolicyTrainerRayProcess pid=9930) Invalidate trace cache @ step 421: expected module 908, but got module 455
+```
+--> 
+```
+pip install --upgrade transformers deepspeed vllm
+```
+The package as in [rlvr_requirements.txt](rlvr_requirements.txt)
