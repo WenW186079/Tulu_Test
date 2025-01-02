@@ -185,7 +185,7 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
     --penalty_reward_value -10.0 \
     --deepspeed_stage 3 \
     --per_device_train_batch_size 1 \ 
-    --local_rollout_forward_batch_size 1 
+    --local_rollout_forward_batch_size 1 \
     --local_mini_batch_size 2 \ 
     --local_rollout_batch_size 2 \ 
     --actor_num_gpus_per_node 7 \ 
