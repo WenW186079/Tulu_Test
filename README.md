@@ -156,8 +156,8 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
     --with_tracking
 ```
 
-- 8B
-  - 8 x RTX A6000, cuda oom
+- 8B model + 8B reward model
+  - GPU: 8 x RTX A6000, cuda oom
   - When I use 6 * A100 PCIe, shows high memory pressure, subsequent cache flushes can slow down the training
   - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
     - because "train_batch_size": 224
@@ -229,13 +229,13 @@ pip install --upgrade transformers deepspeed vllm
 ```
 The package as in [rlvr_requirements.txt](rlvr_requirements.txt)
 
-Might be a problem:
+Might be a problem [leave it or to be solved]:
 
 1. cache, sometimes it will show
 ```
 Invalidate trace cache @ step 422 and module 0: cache has only 422 modules
 ```
-2. [repeated 7x across cluster], no idea
+2. [repeated 7x across cluster], no idea if it's a problem
 
 ```
 (PolicyTrainerRayProcess pid=72803) Applying ground truth reward 🤗 [repeated 7x across cluster]
