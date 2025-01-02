@@ -159,7 +159,7 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
 - 8B
   - When I use 6 * A100 PCIe, shows high memory pressure, subsequent cache flushes can slow down the training
   - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
-  - !!!! [TODO]:make sure it's not stucked? cache problem?
+    - because "train_batch_size": 224
 Example:
 ```
 python open_instruct/ppo_vllm_thread_ray_gtrl.py \
@@ -215,7 +215,7 @@ Cache problem:
 (PolicyTrainerRayProcess pid=9930) Invalidate trace cache @ step 421: expected module 908, but got module 455
 ```
 --> 
-Set the TRITON_CACHE_DIR
+Set the TRITON_CACHE_DIR path to a NFS
 ```
 export TRITON_CACHE_DIR=/tmp/triton/autotune
 echo $TRITON_CACHE_DIR
