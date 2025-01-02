@@ -160,6 +160,8 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
   - When I use 6 * A100 PCIe, shows high memory pressure, subsequent cache flushes can slow down the training
   - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
     - because "train_batch_size": 224
+
+      
 Example:
 ```
 python open_instruct/ppo_vllm_thread_ray_gtrl.py \
@@ -182,11 +184,11 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
     --total_episodes 10000000 \
     --penalty_reward_value -10.0 \
     --deepspeed_stage 3 \
-    --per_device_train_batch_size 1 \ #####  original: 2
-    --local_rollout_forward_batch_size 1 \ #####  original: 2
-    --local_mini_batch_size 16 \ #####  original: 32
-    --local_rollout_batch_size 16 \ #####  original: 32
-    --actor_num_gpus_per_node 6 \ ##### Here, if you use 7 gpu, then put 6 (7-1) 
+    --per_device_train_batch_size 1 \ 
+    --local_rollout_forward_batch_size 1 
+    --local_mini_batch_size 2 \ 
+    --local_rollout_batch_size 2 \ 
+    --actor_num_gpus_per_node 7 \ 
     --vllm_tensor_parallel_size 1 \
     --beta 0.05 \
     --apply_verifiable_reward true \
