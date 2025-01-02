@@ -162,16 +162,16 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
     - because "train_batch_size": 224
 
       
-Example:
+Example:(to save the time, I use samll batch size and reponse length)
 ```
 python open_instruct/ppo_vllm_thread_ray_gtrl.py \
     --dataset_mixer '{"ai2-adapt-dev/gsm8k_math_ifeval_ground_truth_mixed": 1.0}' \
     --dataset_train_splits train \
     --dataset_eval_mixer '{"ai2-adapt-dev/gsm8k_math_ground_truth": 1.0}' \
     --dataset_eval_splits test \
-    --max_token_length 2048 \
-    --max_prompt_token_length 2048 \
-    --response_length 2048 \
+    --max_token_length 1024 \
+    --max_prompt_token_length 1024 \
+    --response_length 1024 \
     --model_name_or_path allenai/Llama-3.1-Tulu-3-8B-DPO \
     --reward_model_path allenai/Llama-3.1-Tulu-3-8B-RM \
     --non_stop_penalty \
@@ -186,8 +186,8 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
     --deepspeed_stage 3 \
     --per_device_train_batch_size 1 \ 
     --local_rollout_forward_batch_size 1 \
-    --local_mini_batch_size 2 \ 
-    --local_rollout_batch_size 2 \ 
+    --local_mini_batch_size 1 \ 
+    --local_rollout_batch_size 1 \ 
     --actor_num_gpus_per_node 7 \ 
     --vllm_tensor_parallel_size 1 \
     --beta 0.05 \
@@ -227,3 +227,17 @@ echo $TRITON_CACHE_DIR
 pip install --upgrade transformers deepspeed vllm
 ```
 The package as in [rlvr_requirements.txt](rlvr_requirements.txt)
+
+Might be a problem:
+
+1. cache, sometimes it will show
+```
+Invalidate trace cache @ step 422 and module 0: cache has only 422 modules
+```
+2. [repeated 7x across cluster], no idea
+
+```
+(PolicyTrainerRayProcess pid=72803) Applying ground truth reward 🤗 [repeated 7x across cluster]
+(PolicyTrainerRayProcess pid=72776) Applying ground truth reward 🤗 [repeated 5x across cluster]
+(PolicyTrainerRayProcess pid=72776) Applying ground truth reward 🤗 [repeated 8x across cluster]
+```
