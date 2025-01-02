@@ -157,6 +157,7 @@ python open_instruct/ppo_vllm_thread_ray_gtrl.py \
 ```
 
 - 8B
+  - 8 x RTX A6000, cuda oom
   - When I use 6 * A100 PCIe, shows high memory pressure, subsequent cache flushes can slow down the training
   - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
     - because "train_batch_size": 224
