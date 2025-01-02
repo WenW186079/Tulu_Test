@@ -215,6 +215,12 @@ Cache problem:
 (PolicyTrainerRayProcess pid=9930) Invalidate trace cache @ step 421: expected module 908, but got module 455
 ```
 --> 
+Set the TRITON_CACHE_DIR
+```
+export TRITON_CACHE_DIR=/tmp/triton/autotune
+echo $TRITON_CACHE_DIR
+```
+
 ```
 pip install --upgrade transformers deepspeed vllm
 ```
