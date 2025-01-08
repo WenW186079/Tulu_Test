@@ -607,6 +607,7 @@ def main(args: FlatArguments):
             )
             device_index = accelerator.local_process_index
             device_map = {"": device_index}  # force data-parallel training.
+            print('======yeah! qlora!======')
             model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 revision=args.model_revision,
@@ -618,6 +619,7 @@ def main(args: FlatArguments):
                 torch_dtype=torch.bfloat16,
                 attn_implementation="flash_attention_2" if args.use_flash_attn else "eager",
             )
+
         else:
             model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
@@ -706,6 +708,7 @@ def main(args: FlatArguments):
         tokenizer.chat_template = "{{ bos_token }}" + tokenizer.chat_template
 
     if args.use_lora:
+        print('======yeah! lora!=======')
         if args.use_qlora:
             model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=args.gradient_checkpointing)
 
@@ -854,11 +857,10 @@ def main(args: FlatArguments):
         wandb_tracker = accelerator.get_tracker("wandb")
 
     # **attach_masks**
-    logger.info("Attaching masks to the model...")
-    world_size = accelerator.num_processes
-    rank = accelerator.process_index
-    attach_masks(model, torch.nn.Linear, world_size, rank)
-    logger.info("Masks attached successfully!")
+    # logger.info("Attaching masks to the model...")
+    # rank = accelerator.process_index
+    # attach_masks(model, torch.nn.Linear, rank)
+    # logger.info("Masks attached successfully!")
 
 
     # Train!
@@ -961,7 +963,7 @@ def main(args: FlatArguments):
                 optimizer.step()  
                 lr_scheduler.step()  
                 optimizer.zero_grad()  
-                model.apply(lambda m: mask_weights(m, verify=True, log=False)) ################
+                #model.apply(lambda m: mask_weights(m, verify=True, log=False)) 
             
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
