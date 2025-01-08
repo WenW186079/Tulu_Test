@@ -1,4 +1,10 @@
-Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.42it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.47it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:01<00:00,  1.53it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  2.02it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.79it/s]
+
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]
+Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.42it/s]
+Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.47it/s]
+Loading checkpoint shards:  75%|███████▌  | 3/4 [00:01<00:00,  1.53it/s]
+Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  2.02it/s]
+Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.79it/s]
 /mount/arbeitsdaten65/studenten4/team-lab-cl/data2024/w/env/lib64/python3.12/site-packages/peft/utils/save_and_load.py:473: UserWarning: Some weights of PeftModelForCausalLM were not initialized from the model checkpoint and are being ignored because you passed `ignore_mismatched_sizes=True`: - base_model.model.lm_head.weight: found shape torch.Size([128264, 4096]) in the checkpoint and torch.Size([128256, 4096]) in the model instantiated
 - base_model.model.model.embed_tokens.weight: found shape torch.Size([128264, 4096]) in the checkpoint and torch.Size([128256, 4096]) in the model instantiated.
   warnings.warn(msg)
