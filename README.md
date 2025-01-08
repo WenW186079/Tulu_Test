@@ -68,6 +68,12 @@ gradient_checkpointing : true ###### add to avoid cuda oom
 reduce_loss : "sum" ###### default is 'mean'
 
 ```
+
+With QLORA version
+```
+sh scripts/finetune_qlora_with_accelerate_config.sh 2 configs/train_configs/sft/mini.yaml
+sh scripts/finetune_qlora_with_accelerate_config.sh 6 configs/train_configs/tulu3/tulu3_sft.yaml
+```
 # Step 2. DPO
 Example:
 - Test: 
