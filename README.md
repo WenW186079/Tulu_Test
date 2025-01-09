@@ -69,7 +69,7 @@ reduce_loss : "sum" ###### default is 'mean'
 
 ```
 
-With QLORA version
+With QLORA version-SFT
 ```
 sh scripts/finetune_qlora_with_accelerate_config.sh 2 configs/train_configs/sft/mini.yaml
 sh scripts/finetune_qlora_with_accelerate_config.sh 7 configs/train_configs/tulu3/tulu3_sft.yaml
@@ -114,6 +114,10 @@ use_lora: false
 dpo_loss_type: dpo_norm
 dpo_beta: 5
 checkpointing_steps: 1000
+```
+With QLORA version-DPO
+```
+sh scripts/dpo_train_with_qlora.sh 2  configs/train_configs/dpo/mini.yaml
 ```
 # Step3: RLVR
 - Test:
