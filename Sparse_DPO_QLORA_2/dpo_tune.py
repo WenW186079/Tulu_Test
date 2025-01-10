@@ -542,7 +542,8 @@ def main(args: FlatArguments):
         raw_datasets = get_datasets(
             args.dataset_mixer,
             configs=args.dataset_config_name,
-            splits=["train"],
+            #splits=["train"], ########################
+            splits=["train_prefs"],
             save_data_dir=args.dataset_mix_dir if accelerator.is_main_process else None,
             columns_to_keep=["chosen", "rejected"],
         )
