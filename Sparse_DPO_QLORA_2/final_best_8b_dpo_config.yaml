@@ -7,11 +7,11 @@ dataset_mixer:
   #allenai/llama-3.1-tulu-3-8b-preference-mixture: 1.0
 tokenizer_name: neuralmagic/Sparse-Llama-3.1-8B-2of4
 use_slow_tokenizer: true
-max_seq_length: 2048  #qlora:1024, handbook:1024
+max_seq_length: 1024  #2048, qlora:1024, handbook:1024
 preprocessing_num_workers: 16
 per_device_train_batch_size: 1
 gradient_accumulation_steps: 16 # designed for 8 GPUs, so batch size 128
-learning_rate: 5.0e-7 #qlora:1.0e-4 , handbook: 5.0e-6
+learning_rate: 5.0e-6 #qlora:1.0e-4 , handbook: 5.0e-6
 lr_scheduler_type: linear # handbook: cosine
 warmup_ratio: 0.1 #qlora:0.03, handbook: 0.1
 weight_decay: 0.0
