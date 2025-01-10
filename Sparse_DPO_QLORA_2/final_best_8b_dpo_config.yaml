@@ -3,18 +3,19 @@ model_revision: main
 use_flash_attn: true
 gradient_checkpointing: true
 dataset_mixer:
-  allenai/llama-3.1-tulu-3-8b-preference-mixture: 1.0
+  HuggingFaceH4/ultrafeedback_binarized: 1.0
+  #allenai/llama-3.1-tulu-3-8b-preference-mixture: 1.0
 tokenizer_name: neuralmagic/Sparse-Llama-3.1-8B-2of4
 use_slow_tokenizer: true
-max_seq_length: 2048 #1024
+max_seq_length: 2048  #qlora:1024, handbook:1024
 preprocessing_num_workers: 16
 per_device_train_batch_size: 1
 gradient_accumulation_steps: 16 # designed for 8 GPUs, so batch size 128
-learning_rate: 5.0e-7 #1e-4 
-lr_scheduler_type: linear
-warmup_ratio: 0.1 #0.03
+learning_rate: 5.0e-7 #qlora:1.0e-4 , handbook: 5.0e-6
+lr_scheduler_type: linear # handbook: cosine
+warmup_ratio: 0.1 #qlora:0.03, handbook: 0.1
 weight_decay: 0.0
-num_train_epochs: 1 #5
+num_train_epochs: 1 #qlora:5, handbook: 1
 output_dir: output/dpo_8b_qlora
 with_tracking: true
 report_to:
@@ -25,16 +26,14 @@ dpo_loss_type: dpo_norm
 dpo_beta: 5
 checkpointing_steps: 1000
 
+# LoRA arguments setted according to 'alignment-handbook'
 use_lora: true
 use_qlora: true
-# lora_rank: 64
-# lora_alpha: 16
-# lora_dropout: 0.1
 lora_rank: 128
-lora_alpha: 32  
-lora_dropout: 0.1
+lora_alpha: 128  
+lora_dropout: 0.05
 
 hf_entity : "WenWW"
-hf_repo_id: "sparse_Llama_8B_2of4_DPO_qlora_test"
+hf_repo_id: "sparse_Llama_8B_2of4_DPO_qlora"
 hf_repo_revision: "main"
 push_to_hub: true
