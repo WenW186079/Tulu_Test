@@ -1,8 +1,9 @@
 #!/bin/bash
-'''
-Example:
-sh qlora/dpo_qlora_merge.sh
-'''
+
+# Example:
+# sh qlora/dpo_qlora_merge.sh
+
+
 python open_instruct/merge_lora.py \
     --lora_model_name_or_path "WenWW/Sparse8B_TO_DPO_Qlora" \
     --base_model_name_or_path "neuralmagic/Sparse-Llama-3.1-8B-2of4" \
