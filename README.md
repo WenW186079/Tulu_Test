@@ -81,6 +81,8 @@ With QLORA version-DPO
 sh scripts/dpo_train_with_qlora.sh 2 configs/train_configs/dpo/mini.yaml
 sh scripts/dpo_train_with_qlora.sh 7 configs/train_configs/tulu3/tulu3_dpo_8b.yaml
 sh scripts/dpo_train_with_qlora.sh 2 configs/train_configs/dpo/final_best_8b_dpo_config.yaml
+
+sh qlora/dpo_train_with_qlora.sh 4 qlora/final_best_8b_dpo_config.yaml
 ```
 
 # Step3: RLVR
