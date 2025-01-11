@@ -135,7 +135,7 @@ class Args:
     dataset_eval_mixer_dict: Optional[dict] = None
     """The dataset eval mixer as a dictionary"""
 
-    # add an argument for enabling QLoRA
+    ################## add an argument for enabling QLoRA ##################
     base_model_name_or_path: Optional[str] = None
     use_qlora: bool = field(default=True)
     LoraTargetModules: List[str] = field(
@@ -616,8 +616,18 @@ class PolicyTrainerRayProcess(RayProcess):
             model_config.model_name_or_path, revision=model_config.model_revision
         )
 
+        # self.policy: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+        #     model_config.model_name_or_path,
+        #     revision=model_config.model_revision,
+        #     torch_dtype=torch.bfloat16,
+        #     attn_implementation="flash_attention_2",
+        #     use_cache=False,
+        # )
+
+
+        ##################
         if args.use_qlora:
-            print('==============qlora!==========')
+            print('==============qlora in self.policy!==========')
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_use_double_quant=True,
@@ -629,8 +639,7 @@ class PolicyTrainerRayProcess(RayProcess):
                 args.base_model_name_or_path,  
                 quantization_config=bnb_config,
                 torch_dtype=torch.bfloat16,
-                use_flash_attention_2=True,
-                tokenizer=self.original_tokenizer
+                attn_implementation="flash_attention_2",
             )
             
             print('=========base_model loaded with quantization.========')       
@@ -639,10 +648,14 @@ class PolicyTrainerRayProcess(RayProcess):
             # 2. 
             self.policy = PeftModel.from_pretrained(
                 base_model,  
-                model_config.model_name_or_path,  
-                ignore_mismatched_sizes=True, 
+                model_config.model_name_or_path,
+                attn_implementation="flash_attention_2",
+                ignore_mismatched_sizes=True,  
                 is_trainable=True
             )
+
+            print("Resizing embeddings for the policy model...")
+            self.policy.resize_token_embeddings(len(self.original_tokenizer)) 
 
             print("LoRA weights loaded successfully.")
             print('=========qloar  model is... ========')
@@ -664,23 +677,18 @@ class PolicyTrainerRayProcess(RayProcess):
             for name, param in self.policy.named_parameters():
                 print(f"{name}: {param.requires_grad}")
 
-            # 3. ref_policy（共享 base_model）
-            self.ref_policy = PeftModel.from_pretrained(
-                base_model,  # 复用 base_model，避免重复加载
-                model_config.model_name_or_path,  # LoRA 权重路径
-                is_trainable=False,  # 设置为不可训练
-            )
+            # 3. ref_policy
+            print('==============qlora in self.ref_policy!==========')
+            self.ref_policy = self.policy
+            for param in self.ref_policy.parameters():
+                param.requires_grad = False  
+
             print("LoRA weights loaded for reference model.")
             disable_dropout_in_model(self.ref_policy)
             print('==========self.ref_policy===========')
             for name, param in self.ref_policy.named_parameters():
                 print(f"{name}: {param.requires_grad}")
             
-        
-
-
-       
-
 
         # AdamOptimizer = DeepSpeedCPUAdam if self.adam_offload else FusedAdam
         # AdamOptimizer = FusedAdam
@@ -842,11 +850,11 @@ class PolicyTrainerRayProcess(RayProcess):
             world_size = vllm_num_engines * vllm_tensor_parallel_size + 1
             backend = args.vllm_sync_backend
             # https://github.com/OpenRLHF/OpenRLHF/issues/313
-            if vllm.__version__ > "0.4.2" and os.getenv("NCCL_P2P_DISABLE", "0") == "0":
-                backend = "gloo"
-                print(
-                    "Warning: using --vllm_sync_backend=gloo for vLLM version > 0.4.2 (or export NCCL_P2P_DISABLE=1)"
-                )
+            # if vllm.__version__ > "0.4.2" and os.getenv("NCCL_P2P_DISABLE", "0") == "0":
+            #     backend = "gloo"
+            #     print(
+            #         "Warning: using --vllm_sync_backend=gloo for vLLM version > 0.4.2 (or export NCCL_P2P_DISABLE=1)"
+            #     )
             refs = [
                 engine.init_process_group.remote(
                     master_address,
@@ -1540,9 +1548,8 @@ class PolicyTrainerRayProcess(RayProcess):
             # else:
             # save model
 
-            #model_to_save.save_pretrained(output_dir, state_dict=output_state_dict)
-            self.policy.save_pretrained(output_dir, safe_serialization=True)
-
+            model_to_save.save_pretrained(output_dir, state_dict=output_state_dict)
+            
             # save tokenizer
             self.original_tokenizer.save_pretrained(output_dir)
 
@@ -1726,11 +1733,11 @@ def main(args: Args, dataset_config: DatasetConfig, model_config: ModelConfig):
         print(
             f"Dataset splits not provided for all datasets. Using the same {args.dataset_train_splits[0]} split for all datasets."
         )
-    if len(args.dataset_eval_splits) != len(args.dataset_eval_mixer_dict) and len(args.dataset_eval_splits) == 1:
-        args.dataset_eval_splits = [args.dataset_eval_splits[0]] * len(args.dataset_eval_mixer_dict)
-        print(
-            f"Dataset splits not provided for all datasets. Using the same {args.dataset_eval_splits[0]} split for all datasets."
-        )
+    # if len(args.dataset_eval_splits) != len(args.dataset_eval_mixer_dict) and len(args.dataset_eval_splits) == 1:
+    #     args.dataset_eval_splits = [args.dataset_eval_splits[0]] * len(args.dataset_eval_mixer_dict)
+    #     print(
+    #         f"Dataset splits not provided for all datasets. Using the same {args.dataset_eval_splits[0]} split for all datasets."
+    #     )
     train_dataset = combine_dataset(
         args.dataset_mixer_dict,
         splits=args.dataset_train_splits,
