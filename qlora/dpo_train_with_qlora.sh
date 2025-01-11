@@ -32,7 +32,7 @@ accelerate launch \
     open_instruct/dpo_tune_qlora.py \
     "$2"
 
-python open_instruct/merge_lora.py \
-    --config_file $CONFIG_FILE \
-    --push_to_hub \
-    --save_tokenizer 
+# python open_instruct/merge_lora.py \
+#     --config_file $CONFIG_FILE \
+#     --push_to_hub \
+#     --save_tokenizer 
