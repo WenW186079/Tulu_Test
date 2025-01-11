@@ -38,6 +38,11 @@ huggingface-cli login
 wandb login
 ```
 
+#0.4 Move relative files
+```
+mv /workspace/open-instruct/qlora/dpo_tune_qlora.py  /workspace/open-instruct/open_instruct/
+```
+
 # Step 1. SFT
 Example:
 - Test: 
