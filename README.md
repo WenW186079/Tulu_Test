@@ -249,3 +249,8 @@ Invalidate trace cache @ step 422 and module 0: cache has only 422 modules
 (PolicyTrainerRayProcess pid=72776) Applying ground truth reward 🤗 [repeated 5x across cluster]
 (PolicyTrainerRayProcess pid=72776) Applying ground truth reward 🤗 [repeated 8x across cluster]
 ```
+
+Qlora 
+'''
+python open_instruct/ppo_vllm_thread_ray_gtrl.py configs/rlvr.yaml
+'''
