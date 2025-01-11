@@ -5,7 +5,7 @@ gradient_checkpointing: true
 dataset_mixer:
   #HuggingFaceH4/ultrafeedback_binarized: 1.0 # handbook, Num examples = 60189
   allenai/llama-3.1-tulu-3-8b-preference-mixture: 1.0  # Num examples = 262824
-max_train_samples: 100
+#max_train_samples: 100
 tokenizer_name: neuralmagic/Sparse-Llama-3.1-8B-2of4
 use_slow_tokenizer: true
 max_seq_length: 1024  #'best':2048, qlora:1024, handbook:1024
@@ -17,14 +17,14 @@ lr_scheduler_type: cosine # linear, handbook: cosine
 warmup_ratio: 0.03 #'best': 0.1 qlora:0.03, handbook: 0.1
 weight_decay: 0.0
 num_train_epochs: 3 #'best':1, qlora:5, handbook: 1
-output_dir: output/dpo_8b_Qlora_2
+output_dir: output/dpo_8b_Qlora_test
 with_tracking: true
 report_to:
   - wandb
 logging_steps: 1
 dpo_loss_type: dpo_norm
 dpo_beta: 3 #'best':5
-checkpointing_steps: 1000
+checkpointing_steps: 2000
 
 # LoRA arguments setted according to 'alignment-handbook'
 use_lora: true
