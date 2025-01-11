@@ -196,9 +196,8 @@ if __name__ == "__main__":
         if "hf_repo_revision" not in configs:  
             if "exp_name" not in configs:
                 configs['exp_name'] = os.path.basename(__file__)[: -len(".py")]
-            configs['hf_repo_revision'] = (
-                f"{configs['exp_name']}__{args.base_model_name_or_path.replace('/', '_')}__{args.seed}__{int(time.time())}"
-            )
+            configs['hf_repo_revision'] = "main"
+            
         push_folder_to_hub(
             output_dir,
             hf_repo_id=hf_repo_id,
