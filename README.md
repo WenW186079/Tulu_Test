@@ -107,6 +107,7 @@ python Mask/ppo_vllm_thread_ray_gtrl_mask.py Mask/rlvr_mask.yaml
 ```
 
 ⚠️ With QLORA version-RLVR [TODO: debug]
+- Need to merge lora, but it will affect the sparse structure
 ```
 python qlora/ppo_vllm_thread_ray_gtrl_qlora.py qlora/rlvr_qlora.yaml
 ```
