@@ -109,7 +109,7 @@ from open_instruct.utils import (
 )
 from open_instruct.vllm_utils2 import create_vllm_engines, init_process_group
 
-from open_instruct.mask import mask_weights, verify_sparsity, attach_masks
+from mask import mask_weights, verify_sparsity, attach_masks
 
 api = HfApi()
 INVALID_LOGPROB = 1.0
