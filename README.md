@@ -82,6 +82,7 @@ sh scripts/dpo_train_with_accelerate_config.sh 3 configs/train_configs/tulu3/tul
     
 With MASK version-DPO
 ```
+# Here 4 is gpu number
 sh Mask/dpo_train_mask.sh 4 qlora/8b_dpo_mask.yaml
 ```
 
