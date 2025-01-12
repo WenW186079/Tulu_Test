@@ -74,7 +74,7 @@ sh scripts/dpo_train_with_accelerate_config.sh 1 configs/train_configs/dpo/mini.
 sh scripts/dpo_train_with_accelerate_config.sh 3 configs/train_configs/tulu3/tulu3_dpo_8b.yaml
 ```
 
-- 8B :
+- Normal-8B :
   - GPU: 3 * A100 PCIe
   - High memory pressure
   - Run with loss
