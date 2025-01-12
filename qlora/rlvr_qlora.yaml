@@ -14,7 +14,7 @@ max_token_length: 2048
 max_prompt_token_length: 2048
 response_length: 2048
 
-model_name_or_path: WenWW/sparse_Llama_8B_2of4_SFT_lora 
+model_name_or_path: WenWW/Llama_1B_lora 
 reward_model_path: HuggingFaceTB/SmolLM2-360M-Instruct  # allenai/Llama-3.1-Tulu-3-8B-RM
 
 non_stop_penalty: true
