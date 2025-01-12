@@ -15,7 +15,7 @@ max_prompt_token_length: 2048
 response_length: 2048
 
 model_name_or_path: WenWW/sparse_Llama_8B_2of4_SFT_lora 
-reward_model_path: allenai/Llama-3.1-Tulu-3-8B-RM
+reward_model_path: HuggingFaceTB/SmolLM2-360M-Instruct  # allenai/Llama-3.1-Tulu-3-8B-RM
 
 non_stop_penalty: true
 stop_token: eos
@@ -26,7 +26,7 @@ chat_template: tulu
 sft_messages_key: messages
 
 learning_rate: 3.0e-7
-total_episodes: 10000000
+total_episodes: 1000 #10000000
 penalty_reward_value: -10.0
 
 deepspeed_stage: 2
@@ -40,7 +40,7 @@ vllm_tensor_parallel_size: 1
 beta: 0.05
 
 apply_verifiable_reward: true
-output_dir: output/rlvr_8b
+output_dir: output/rlvr_8b_q
 
 seed: 3
 num_evals: 3
