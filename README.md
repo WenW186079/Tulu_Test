@@ -33,19 +33,17 @@ export TRITON_CACHE_DIR="/tmp/triton/autotune"
 ```
 cd .. &
 git clone https://github.com/WenW186079/Tulu_Test.git &&
+mv Tulu_Test/Mask Tulu_Test/qlora open-instruct/ &&
+cd open-instruct
 
 ```
-# 0.3 Login hugggingface and wandb
+# 0.4 Login hugggingface and wandb
 ```
 huggingface-cli login
 
 wandb login
 ```
 
-#0.4 Move relative files
-```
-mv /workspace/open-instruct/qlora/dpo_tune_qlora.py  /workspace/open-instruct/open_instruct/
-```
 
 # Step 1. SFT
 Example:
