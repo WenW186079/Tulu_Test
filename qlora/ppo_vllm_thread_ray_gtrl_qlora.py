@@ -55,7 +55,7 @@ from open_instruct.dataset_processor import (
     SimpleGenerateCollatorWithGroundTruth,
     visualize_token,
 )
-from model_utils import (
+from open_instruct.model_utils import (
     ModelConfig,
     apply_verifiable_reward,
     disable_dropout_in_model,
