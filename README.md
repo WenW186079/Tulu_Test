@@ -105,7 +105,7 @@ python qlora/ppo_vllm_thread_ray_gtrl_mask.py qlora/rlvr_mask.yaml
 
 With QLORA version-RLVR
 ```
-python open_instruct/ppo_vllm_thread_ray_gtrl.py configs/rlvr.yaml
+python qlora/ppo_vllm_thread_ray_gtrl_qlora.py qlora/rlvr_qlora.yaml
 ```
 
 
