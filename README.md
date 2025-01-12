@@ -98,6 +98,11 @@ sh qlora/dpo_train_with_qlora.sh 4 qlora/final_best_8b_dpo_config.yaml
   - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
     - because "train_batch_size": 224
 
+With MASK version-RLVR
+```
+python qlora/ppo_vllm_thread_ray_gtrl_mask.py qlora/rlvr_mask.yaml
+```
+
 With QLORA version-RLVR
 ```
 python open_instruct/ppo_vllm_thread_ray_gtrl.py configs/rlvr.yaml
