@@ -99,17 +99,18 @@ sh qlora/dpo_train_with_qlora.sh 2 qlora/8b_dpo_qlora.yaml
   - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
     - because "train_batch_size": 224
 
-With MASK version-RLVR
+With MASK version-RLVR [TODO: debug for sparse model]
 ```
 python Mask/ppo_vllm_thread_ray_gtrl_mask.py Mask/rlvr_mask.yaml
 ```
 
-With QLORA version-RLVR
+With QLORA version-RLVR [TODO: debug]
 ```
 python qlora/ppo_vllm_thread_ray_gtrl_qlora.py qlora/rlvr_qlora.yaml
 ```
 
 
+# Extra
 
 Some bugs will happen if you use lower version GPU, for example:
 - `Bfloat16 is only supported on GPUs with compute capability of at least 8.0. `
@@ -142,6 +143,7 @@ Might be a problem [leave it or to be solved]:
 Invalidate trace cache @ step 422 and module 0: cache has only 422 modules
 ```
 2. [repeated 7x across cluster], no idea if it's a problem
+     --> not a problem
 
 ```
 (PolicyTrainerRayProcess pid=72803) Applying ground truth reward 🤗 [repeated 7x across cluster]
