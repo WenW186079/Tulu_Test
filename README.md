@@ -6,7 +6,6 @@ python -m venv tulu_env &&
 source tulu_env/bin/activate
 ```
 
-
 # 0.1 Install requirements
 ```
 git clone https://github.com/allenai/open-instruct.git &&
@@ -32,7 +31,8 @@ export TRITON_CACHE_DIR="/tmp/triton/autotune"
 ```
 # 0.3 Clone these files and move to relative dictionary
 ```
-git clone https://github.com/WenW186079/Tulu_Test.git
+cd .. &
+git clone https://github.com/WenW186079/Tulu_Test.git &&
 
 ```
 # 0.3 Login hugggingface and wandb
