@@ -5,7 +5,7 @@ gradient_checkpointing: true
 dataset_mixer:
   #HuggingFaceH4/ultrafeedback_binarized: 1.0 # handbook, Num examples = 60189
   allenai/llama-3.1-tulu-3-8b-preference-mixture: 1.0  # Num examples = 262824
-max_train_samples: 100
+#max_train_samples: 100
 tokenizer_name: neuralmagic/Sparse-Llama-3.1-8B-2of4
 use_slow_tokenizer: true
 max_seq_length: 1024  #'best':2048, qlora:1024, handbook:1024
