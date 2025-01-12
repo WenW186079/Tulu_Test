@@ -99,7 +99,9 @@ sh qlora/dpo_train_with_qlora.sh 2 qlora/8b_dpo_qlora.yaml
   - GPU: 7 * A100 PCIe, no cuda oom, shows no bug, but run really slow, 20mins didn't see the loss
     - because "train_batch_size": 224
 
-⚠️ With MASK version-RLVR [TODO: debug for sparse model]
+⚠️ With MASK version-RLVR 
+- Works for normal model with mask
+- [TODO: debug for sparse model]
 ```
 python Mask/ppo_vllm_thread_ray_gtrl_mask.py Mask/rlvr_mask.yaml
 ```
