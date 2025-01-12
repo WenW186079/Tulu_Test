@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# example usage
-# sh Mask/dpo_train_mask.sh 2 Mask/8b_dpo_mask.yaml
-
 # Check if exactly two arguments are provided
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <num_gpus> <config_file>"
@@ -29,5 +26,5 @@ accelerate launch \
     --num_processes $NUM_GPUS \
     --use_deepspeed \
     --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \
-    qlora/dpo_tune_mask.py \
+    Mask/dpo_tune_mask.py \
     "$2"
