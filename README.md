@@ -30,7 +30,11 @@ export HF_HOME="/workspace" &&
 export TRITON_CACHE_DIR="/tmp/triton/autotune"
 
 ```
+# 0.3 Clone these files and move to relative dictionary
+```
+git clone https://github.com/WenW186079/Tulu_Test.git
 
+```
 # 0.3 Login hugggingface and wandb
 ```
 huggingface-cli login
