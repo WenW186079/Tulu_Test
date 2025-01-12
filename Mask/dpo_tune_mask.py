@@ -906,9 +906,8 @@ def main(args: FlatArguments):
 
     # **attach_masks**
     logger.info("Attaching masks to the model...")
-    world_size = accelerator.num_processes
     rank = accelerator.process_index
-    attach_masks(model, torch.nn.Linear, world_size, rank)
+    attach_masks(model, torch.nn.Linear, rank)
     logger.info("Masks attached successfully!")
 
     # Train!
