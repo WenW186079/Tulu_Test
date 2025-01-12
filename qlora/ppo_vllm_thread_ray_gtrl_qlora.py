@@ -1,32 +1,3 @@
-# Copyright 2024 AllenAI. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ---------------------------------------------------------------------
-# Part of the code is adapted from https://github.com/OpenRLHF/OpenRLHF
-# which has the following license:
-# Copyright [yyyy] [name of copyright owner]
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 import gc
 import json
@@ -84,7 +55,7 @@ from open_instruct.dataset_processor import (
     SimpleGenerateCollatorWithGroundTruth,
     visualize_token,
 )
-from open_instruct.model_utils import (
+from model_utils import (
     ModelConfig,
     apply_verifiable_reward,
     disable_dropout_in_model,
@@ -140,13 +111,7 @@ class Args:
     use_qlora: bool = field(default=True)
     LoraTargetModules: List[str] = field(
         default_factory=lambda: [
-            "q_proj",
-            "k_proj",
-            "v_proj",
-            "o_proj",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
+            "q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj",
         ]
     )
   
@@ -396,22 +361,14 @@ def get_train_ds_config(
         "stage3_param_persistence_threshold": "auto",
         "stage3_prefetch_bucket_size": "auto",
         "reduce_bucket_size": "auto",
-        # # ZeRO++
-        # "zero_hpz_partition_size": zpg,
-        # "zero_quantized_weights": False,
-        # "zero_quantized_gradients": False,
     }
     if disable_trace_cache:
         zero_opt_dict["stage3_prefetch_bucket_size"] = 0
-        zero_opt_dict["stage3_max_live_parameters"] = 0
-        zero_opt_dict["stage3_max_reuse_distance"] = 0
 
     return {
         "steps_per_print": 100,
         "zero_optimization": zero_opt_dict,
-        "bf16": {
-            "enabled": bf16,
-        },
+        "bf16": {"enabled": bf16,},
         "gradient_clipping": max_norm,
         "prescale_gradients": False,
         "wall_clock_breakdown": False,
@@ -597,7 +554,7 @@ class PolicyTrainerRayProcess(RayProcess):
         ds_config = get_train_ds_config(
             offload=False,
             adam_offload=False,
-            stage=args.deepspeed_stage,
+            stage=1,
             bf16=True,
         )
         ds_config["train_micro_batch_size_per_gpu"] = args.per_device_train_batch_size
@@ -640,6 +597,7 @@ class PolicyTrainerRayProcess(RayProcess):
                 quantization_config=bnb_config,
                 torch_dtype=torch.bfloat16,
                 attn_implementation="flash_attention_2",
+                use_cache=False,
             )
             
             print('=========base_model loaded with quantization.========')       
@@ -651,14 +609,14 @@ class PolicyTrainerRayProcess(RayProcess):
                 model_config.model_name_or_path,
                 attn_implementation="flash_attention_2",
                 ignore_mismatched_sizes=True,  
-                is_trainable=True
+                is_trainable=True,
             )
 
             print("Resizing embeddings for the policy model...")
             self.policy.resize_token_embeddings(len(self.original_tokenizer)) 
 
             print("LoRA weights loaded successfully.")
-            print('=========qloar  model is... ========')
+            # print('=========qloar  model is... ========')
             #print(self.policy)
             self.policy.print_trainable_parameters()
 
@@ -673,21 +631,10 @@ class PolicyTrainerRayProcess(RayProcess):
 
             # for name, param in self.policy.named_parameters():
             #         param.requires_grad = True
-            print('==========self.policy===========')
-            for name, param in self.policy.named_parameters():
-                print(f"{name}: {param.requires_grad}")
 
-            # 3. ref_policy
-            print('==============qlora in self.ref_policy!==========')
-            self.ref_policy = self.policy
-            for param in self.ref_policy.parameters():
-                param.requires_grad = False  
-
-            print("LoRA weights loaded for reference model.")
-            disable_dropout_in_model(self.ref_policy)
-            print('==========self.ref_policy===========')
-            for name, param in self.ref_policy.named_parameters():
-                print(f"{name}: {param.requires_grad}")
+            # print('==========self.policy===========')
+            # for name, param in self.policy.named_parameters():
+            #     print(f"{name}: {param.requires_grad}")
             
 
         # AdamOptimizer = DeepSpeedCPUAdam if self.adam_offload else FusedAdam
@@ -696,9 +643,9 @@ class PolicyTrainerRayProcess(RayProcess):
         # optim_params = get_optimizer_grouped_parameters(self.policy, weight_decay)
         # self.optimizer = AdamOptimizer(optim_params, lr=args.learning_rate)
         
-        trainable_params = [p for p in self.policy.parameters() if p.requires_grad]
-        self.optimizer = torch.optim.AdamW(trainable_params, lr=args.learning_rate)
-        #self.optimizer = torch.optim.AdamW(self.policy.parameters(), lr=args.learning_rate)
+        # trainable_params = [p for p in self.policy.parameters() if p.requires_grad]
+        # self.optimizer = torch.optim.AdamW(trainable_params, lr=args.learning_rate)
+        self.optimizer = torch.optim.AdamW(self.policy.parameters(), lr=args.learning_rate)
     
 
         num_training_steps = args.num_training_steps * args.num_train_epochs * args.num_epochs
@@ -711,6 +658,12 @@ class PolicyTrainerRayProcess(RayProcess):
             num_warmup_steps=warm_up_steps,
             num_training_steps=num_training_steps,
         )
+
+        # 确保 DeepSpeed 初始化前，打印出可训练参数列表
+        trainable_params = [p for p in self.policy.parameters() if p.requires_grad]
+        assert len(trainable_params) > 0, "Error: No trainable parameters found for DeepSpeed!"
+        print(f"Number of trainable parameters: {len(trainable_params)}")
+
 
         print(ds_config)
         self.model, self.optimizer, _, self.scheduler = deepspeed.initialize(
@@ -759,7 +712,7 @@ class PolicyTrainerRayProcess(RayProcess):
         # reference model
         ds_config = get_eval_ds_config(
             offload=False,
-            stage=args.deepspeed_stage,
+            stage=0,
             bf16=True,
         )
         ds_config["train_micro_batch_size_per_gpu"] = args.per_device_train_batch_size
@@ -773,6 +726,19 @@ class PolicyTrainerRayProcess(RayProcess):
         else:
             dschf = None
         print(f"{dschf=}")
+
+      
+        print('==============qlora in self.ref_policy!==========')
+        self.ref_policy = self.policy
+        for param in self.ref_policy.parameters():
+            param.requires_grad = False  
+
+        print("LoRA weights loaded for reference model.")
+        disable_dropout_in_model(self.ref_policy)
+        # print('==========self.ref_policy===========')
+        # for name, param in self.ref_policy.named_parameters():
+        #     print(f"{name}: {param.requires_grad}")
+
         
         self.ref_policy, *_ = deepspeed.initialize(model=self.ref_policy, config=ds_config)
         self.ref_policy.eval()
@@ -780,6 +746,7 @@ class PolicyTrainerRayProcess(RayProcess):
 
 
         # reward model
+        print('========reward model loading...=========')
         if args.reward_model_multiplier:
             self.reward_model: PreTrainedModel = AutoModelForSequenceClassification.from_pretrained(
                 args.reward_model_path,
@@ -880,6 +847,9 @@ class PolicyTrainerRayProcess(RayProcess):
             # avoid OOM
             torch.cuda.empty_cache()
             model = self.model.module
+            print('===========broadcast_to_vllm=========')
+            print(model)
+
             count, num_params = 0, len(list(model.named_parameters()))
             refss = []
             if args.gather_whole_model:
@@ -963,6 +933,8 @@ class PolicyTrainerRayProcess(RayProcess):
             resume_training_step: int,
         ):
             llm = vllm_engines[0]
+            print('=========== vllm_engines[0]=========')
+            print(llm)
             for training_step in range(resume_training_step, num_training_steps + 1):
                 items = param_prompt_Q.get()
                 if items is None:
