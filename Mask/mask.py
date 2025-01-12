@@ -64,7 +64,7 @@ def verify_sparsity(weight_tensor, target_sparsity=0.5, tolerance=1e-3):
 
     
 def attach_masks(model, to_layer, rank):
-    print('=========== apply attach_masks ===========')
+    #print('=========== apply attach_masks ===========')
     total_layers = 0
     correct_sparsity_layers = 0
     skipped_empty_layers = 0
