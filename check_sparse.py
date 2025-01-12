@@ -39,17 +39,12 @@ def check_model_sparsity(model):
         "Sparsity %": f"{overall_sparsity:.2f}%"
     })
 
-    # 使用 pandas DataFrame 展示结果
+    
     df = pd.DataFrame(layer_data)
     print(df.to_string(index=False))
     return df
 
 base_model = AutoModelForCausalLM.from_pretrained("neuralmagic/Sparse-Llama-3.1-8B-2of4")
-
-model = PeftModel.from_pretrained(
-    base_model,
-    "WenWW/sparse_Llama_8B_2of4_SFT_qlora_test",
-    ignore_mismatched_sizes=True,
-)
+model = PeftModel.from_pretrained(base_model, "WenWW/Sparse8B_TO_DPO_Qlora",ignore_mismatched_sizes=True)
 
 sparsity_df = check_model_sparsity(model)
