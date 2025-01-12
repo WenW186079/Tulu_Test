@@ -99,7 +99,6 @@ def parse_args():
     parser.add_argument("--pad_to_multiple_of", type=int, default=8)  # if you want to pad the token embeddings
     parser.add_argument("--push_to_hub", action="store_true")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--hf_repo_id", type=str, required=False, help="Name of the Hugging Face repository")
     return parser.parse_args()
 
 
@@ -167,8 +166,7 @@ if __name__ == "__main__":
             base_model.resize_token_embeddings(len(tokenizer))
 
     print("Loading the lora model...")
-    #lora_model = PeftModel.from_pretrained(base_model, args.lora_model_name_or_path)
-    lora_model = PeftModel.from_pretrained(base_model, args.lora_model_name_or_path,ignore_mismatched_sizes=True)
+    lora_model = PeftModel.from_pretrained(base_model, args.lora_model_name_or_path,ignore_mismatched_sizes=True,)
     print("Merging the lora modules...")
     merged_model = lora_model.merge_and_unload()
 
@@ -183,23 +181,21 @@ if __name__ == "__main__":
         tokenizer.save_pretrained(output_dir)
 
     if args.push_to_hub:
-        hf_repo_id = args.hf_repo_id if args.hf_repo_id else configs.get("hf_repo_id", "open_instruct_dev")
-        
-        if "hf_entity" not in configs:  
+        if "hf_repo_id" not in configs:  # auto-generate one
+            configs['hf_repo_id'] = "open_instruct_dev"
+        if "hf_entity" not in configs:  # first try to use AI2 entity
             configs['hf_entity'] = maybe_use_ai2_hf_entity()
-        if configs['hf_entity'] is None:  
+        if configs['hf_entity'] is None:  # then try to use the user's entity
             configs['hf_entity'] = HfApi().whoami()["name"]
-
-        if "/" not in hf_repo_id:
-            hf_repo_id = f"{configs['hf_entity']}/{hf_repo_id}"
-        
-        if "hf_repo_revision" not in configs:  
+        configs['hf_repo_id'] = f"{configs['hf_entity']}/{configs['hf_repo_id']}"
+        if "hf_repo_revision" not in configs:  # auto-generate one
             if "exp_name" not in configs:
                 configs['exp_name'] = os.path.basename(__file__)[: -len(".py")]
-            configs['hf_repo_revision'] = "main"
-            
+            configs['hf_repo_revision'] = (
+                f"{configs['exp_name']}__{args.base_model_name_or_path.replace('/', '_')}__{args.seed}__{int(time.time())}"
+            )
         push_folder_to_hub(
             output_dir,
-            hf_repo_id=hf_repo_id,
-            hf_repo_revision=configs["hf_repo_revision"],
+            configs["hf_repo_id"],
+            configs["hf_repo_revision"],
         )
