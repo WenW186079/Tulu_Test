@@ -969,56 +969,29 @@ class PolicyTrainerRayProcess(RayProcess):
                     break
                 unwrapped_model, g_queries_list = items
 
-                # 合并 LoRA 权重进行推理
-                with self.policy.merge_and_unload():
-                    generation_start_time = time.time()
-                    outputs = ray.get(
-                        llm.generate.remote(
-                            sampling_params=generation_config,
-                            prompt_token_ids=g_queries_list,
-                            use_tqdm=False
-                        )
-                    )
-                    response_ids = [list(out.token_ids) for output in outputs for out in output.outputs]
-                    print(f"🔥🔥🔥 Generation time: {time.time() - generation_start_time:.2f} seconds")
-                    response_ids_Q.put(response_ids)
-
                 # if unwrapped_model is not None:
-                # generation_start_time = time.time()
+                generation_start_time = time.time()
 
-                # outputs = ray.get(
-                #     llm.generate.remote(
-                #         sampling_params=generation_config, prompt_token_ids=g_queries_list, use_tqdm=False
-                #     )
-                # )
-                # response_ids = [list(out.token_ids) for output in outputs for out in output.outputs]
-                # print(f"🔥🔥🔥 Generation time: {time.time() - generation_start_time:.2f} seconds")
-                # response_ids_Q.put(response_ids)
+                outputs = ray.get(
+                    llm.generate.remote(
+                        sampling_params=generation_config, prompt_token_ids=g_queries_list, use_tqdm=False
+                    )
+                )
+                response_ids = [list(out.token_ids) for output in outputs for out in output.outputs]
+                print(f"🔥🔥🔥 Generation time: {time.time() - generation_start_time:.2f} seconds")
+                response_ids_Q.put(response_ids)
 
                 if sample_evaluation_prompt_token_ids is not None and (training_step - 1) % eval_freq == 0:
-                    with self.policy.merge_and_unload():
-                        outputs = ray.get(
-                            llm.generate.remote(
-                                prompt_token_ids=sample_evaluation_prompt_token_ids,
-                                sampling_params=generation_config,
-                                use_tqdm=False,
-                            )
+                    outputs = ray.get(
+                        llm.generate.remote(
+                            prompt_token_ids=sample_evaluation_prompt_token_ids,
+                            sampling_params=generation_config,
+                            use_tqdm=False,
                         )
-                        # for evaluation, even if we have multiple outputs, we only look at one of them for simplicity
-                        response_ids = [list(output.outputs[0].token_ids) for output in outputs]
-                        evaluation_Q.put(response_ids)
-
-                # if sample_evaluation_prompt_token_ids is not None and (training_step - 1) % eval_freq == 0:
-                #     outputs = ray.get(
-                #         llm.generate.remote(
-                #             prompt_token_ids=sample_evaluation_prompt_token_ids,
-                #             sampling_params=generation_config,
-                #             use_tqdm=False,
-                #         )
-                #     )
-                #     # for evaluation, even if we have multiple outputs, we only look at one of them for simplicity
-                #     response_ids = [list(output.outputs[0].token_ids) for output in outputs]
-                #     evaluation_Q.put(response_ids)
+                    )
+                    # for evaluation, even if we have multiple outputs, we only look at one of them for simplicity
+                    response_ids = [list(output.outputs[0].token_ids) for output in outputs]
+                    evaluation_Q.put(response_ids)
 
         resume_training_step = 1
         if accelerator.is_main_process:
