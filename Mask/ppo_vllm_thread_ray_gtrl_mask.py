@@ -801,7 +801,7 @@ class PolicyTrainerRayProcess(RayProcess):
             model = self.model.module
             count, num_params = 0, len(list(model.named_parameters()))
             for name, param in model.named_parameters():
-                if count % 100 == 0:  # 每隔 100 个参数打印状态
+                if count % 100 == 0:  # for print
                     print(f"Rank {self.rank}: Broadcasting param {count}/{num_params}, shape={param.shape}")
                 count += 1
             print("Rank {self.rank}: Finished broadcasting.")
@@ -961,9 +961,8 @@ class PolicyTrainerRayProcess(RayProcess):
 
         # **attach_masks**
         print("Attaching masks to the model...")
-        rank = (self.rank + 1)
-        print('self.rank=',self.rank,'    rank=',rank)
-        attach_masks(self.model, torch.nn.Linear, rank)
+        # rank = (self.rank + 1)
+        attach_masks(self.model, torch.nn.Linear, self.rank)
         print("Masks attached successfully!")
 
         # training loop
