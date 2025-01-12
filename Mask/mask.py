@@ -5,7 +5,7 @@ import deepspeed
 
 @torch.no_grad()
 def mask_weights(module, verify=False, log=False):
-    print(' ========= apply mask_weights ==========')
+    #print(' ========= apply mask_weights ==========')
     """Apply mask to sharded weights directly with verification."""
     if isinstance(module, torch.nn.Linear) and hasattr(module, 'mask'):
         if module.weight.numel() == 0:
