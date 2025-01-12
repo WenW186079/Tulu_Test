@@ -743,6 +743,10 @@ class PolicyTrainerRayProcess(RayProcess):
         metrics_queue: RayQueue,
         data_collator: Callable,
     ):
+        print(f"Rank {self.rank}: Train method started.")
+        print(f"Rank {self.rank}: Training dataset size: {len(train_dataset)}, Eval dataset size: {len(eval_dataset) if eval_dataset else 0}")
+        print(f"Rank {self.rank}: Local rollout batch size: {self.args.local_rollout_batch_size}")
+
         torch.set_printoptions(precision=4, sci_mode=False)
 
         args = self.args
@@ -791,10 +795,18 @@ class PolicyTrainerRayProcess(RayProcess):
         torch.distributed.barrier()
 
         def broadcast_to_vllm():
+            print(f"Rank {self.rank}: Broadcasting weights to vLLM engines.")
             # avoid OOM
             torch.cuda.empty_cache()
             model = self.model.module
             count, num_params = 0, len(list(model.named_parameters()))
+            for name, param in model.named_parameters():
+                if count % 100 == 0:  # 每隔 100 个参数打印状态
+                    print(f"Rank {self.rank}: Broadcasting param {count}/{num_params}, shape={param.shape}")
+                count += 1
+            print("Rank {self.rank}: Finished broadcasting.")
+            torch.cuda.synchronize()
+    
             refss = []
             if args.gather_whole_model:
                 with deepspeed.zero.GatheredParameters(model.parameters(), enabled=args.deepspeed_stage == 3):
@@ -1084,6 +1096,7 @@ class PolicyTrainerRayProcess(RayProcess):
                     logprob = self.forward(
                         query_response, response, tokenizer.pad_token_id, context_length, args.temperature
                     )
+                    print(f"Rank {self.rank}: Forward pass completed. Logits shape: {logprob.shape}")
                     torch.cuda.empty_cache()
 
                     ref_output = forward(self.ref_policy, query_response, tokenizer.pad_token_id)
@@ -1109,6 +1122,8 @@ class PolicyTrainerRayProcess(RayProcess):
                         _, score, _ = get_reward(
                             self.reward_model, postprocessed_query_response, tokenizer.pad_token_id, context_length
                         )
+                        print(f"Rank {self.rank}: Reward obtained. Score shape: {score.shape}, min: {score.min()}, max: {score.max()}")
+
                         score *= args.reward_model_multiplier
                     if args.apply_verifiable_reward:
                         # we need to batch the gt to match query.
@@ -1257,9 +1272,10 @@ class PolicyTrainerRayProcess(RayProcess):
                         vf_losses2 = torch.square(vpredclipped - mb_return)
                         vf_loss_max = torch.max(vf_losses1, vf_losses2)
                         vf_loss = 0.5 * masked_mean(vf_loss_max, ~mb_padding_mask_p1)
+                        print(f"Rank {self.rank}: Value function loss computed: {vf_loss.item()}")
                         self.value_model.backward(vf_loss * args.vf_coef)
                         self.value_model.step()
-
+                        print(f"Rank {self.rank}: Policy model stepped. Loss: {loss.item()}")
                         new_logprobs = self.forward(
                             mb_query_responses, mb_responses, tokenizer.pad_token_id, context_length, args.temperature
                         )
@@ -1279,8 +1295,8 @@ class PolicyTrainerRayProcess(RayProcess):
                         self.model.step()
                         # print("step", self.rank, "micro batch start", micro_batch_start)
                         
-                        self.model.apply(lambda m: mask_weights(m, verify=True, log=False))
-
+                        self.model.apply(lambda m: mask_weights(m, verify=True, log=True))
+                        print(f"Rank {self.rank}: Mask weights applied.")
                         with torch.no_grad():
                             # print("waiting for value model step", self.rank, "micro batch start", micro_batch_start)
                             # vf_loss, vf_clipfrac = ray.get(value_model_step_future)
