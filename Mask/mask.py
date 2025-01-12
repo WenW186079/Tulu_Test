@@ -5,6 +5,7 @@ import deepspeed
 
 @torch.no_grad()
 def mask_weights(module, verify=False, log=False):
+    print(' ========= apply mask_weights ==========')
     """Apply mask to sharded weights directly with verification."""
     if isinstance(module, torch.nn.Linear) and hasattr(module, 'mask'):
         if module.weight.numel() == 0:
@@ -62,7 +63,8 @@ def verify_sparsity(weight_tensor, target_sparsity=0.5, tolerance=1e-3):
 
 
     
-def attach_masks(model, to_layer, world_size, rank):
+def attach_masks(model, to_layer, rank):
+    print('=========== apply attach_masks ===========')
     total_layers = 0
     correct_sparsity_layers = 0
     skipped_empty_layers = 0
