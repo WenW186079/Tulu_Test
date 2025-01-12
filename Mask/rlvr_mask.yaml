@@ -14,7 +14,7 @@ max_token_length: 2048
 max_prompt_token_length: 2048
 response_length: 2048
 
-model_name_or_path: neuralmagic/Sparse-Llama-3.1-8B-2of4
+model_name_or_path: WenWW/sparse_Llama_8B_2of4_DPO_mask
 reward_model_path: HuggingFaceTB/SmolLM2-360M-Instruct  # allenai/Llama-3.1-Tulu-3-8B-RM
 
 
@@ -36,7 +36,7 @@ local_rollout_forward_batch_size: 2
 local_mini_batch_size: 32
 local_rollout_batch_size: 32
 
-actor_num_gpus_per_node: [3]
+actor_num_gpus_per_node: [6]
 vllm_tensor_parallel_size: 1
 beta: 0.05
 
