@@ -28,8 +28,8 @@ accelerate launch \
     --num_machines 1 \
     --num_processes $NUM_GPUS \
     --use_deepspeed \
-    --deepspeed_config_file configs/ds_configs/stage2.conf \
-    open_instruct/dpo_tune_qlora.py \
+    --deepspeed_config_file qlora/stage2.conf \
+    qlora/dpo_tune_qlora.py \
     "$2"
 
 python open_instruct/merge_lora.py \
