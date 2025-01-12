@@ -36,12 +36,12 @@ local_rollout_forward_batch_size: 2
 local_mini_batch_size: 32
 local_rollout_batch_size: 32
 
-actor_num_gpus_per_node: [6]
+actor_num_gpus_per_node: [1] # Here is (gpu number -1)
 vllm_tensor_parallel_size: 1
 beta: 0.05
 
 apply_verifiable_reward: true
-output_dir: output/rlvr_8b
+output_dir: output/rlvr_8b_mask
 
 seed: 3
 num_evals: 3
