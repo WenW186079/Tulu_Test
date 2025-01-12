@@ -69,25 +69,23 @@ Example:
 - Test: 
 ```
 sh scripts/dpo_train_with_accelerate_config.sh 1 configs/train_configs/dpo/mini.yaml
+sh scripts/dpo_train_with_accelerate_config.sh 3 configs/train_configs/tulu3/tulu3_dpo_8b.yaml
 ```
 
 - 8B :
   - GPU: 3 * A100 PCIe
   - High memory pressure
   - Run with loss
-    
-```
-sh scripts/dpo_train_with_accelerate_config.sh 3 configs/train_configs/tulu3/tulu3_dpo_8b.yaml
-```
 
+    
+With MASK version-DPO
+```
+sh Mask/dpo_train_mask.sh 4 qlora/8b_dpo_mask.yaml
+```
 
 With QLORA version-DPO
 ```
-sh scripts/dpo_train_with_qlora.sh 2 configs/train_configs/dpo/mini.yaml
-sh scripts/dpo_train_with_qlora.sh 7 configs/train_configs/tulu3/tulu3_dpo_8b.yaml
-sh scripts/dpo_train_with_qlora.sh 2 configs/train_configs/dpo/final_best_8b_dpo_config.yaml
-
-sh qlora/dpo_train_with_qlora.sh 4 qlora/final_best_8b_dpo_config.yaml
+sh qlora/dpo_train_with_qlora.sh 4 qlora/8b_dpo_qlora.yaml
 ```
 
 # Step3: RLVR
@@ -100,7 +98,7 @@ sh qlora/dpo_train_with_qlora.sh 4 qlora/final_best_8b_dpo_config.yaml
 
 With MASK version-RLVR
 ```
-python qlora/ppo_vllm_thread_ray_gtrl_mask.py qlora/rlvr_mask.yaml
+python Mask/ppo_vllm_thread_ray_gtrl_mask.py Mask/rlvr_mask.yaml
 ```
 
 With QLORA version-RLVR
