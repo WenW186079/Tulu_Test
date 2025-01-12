@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# example usage
-# sh scripts/finetune_with_accelerate_config.sh 1 configs/train_configs/sft/default.yaml
-# sh scripts/finetune_with_accelerate_config.sh 8 configs/train_configs/sft/olmo_17_sft.yaml
-
 # Check if exactly two arguments are provided
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <num_gpus> <config_file>"
