@@ -17,7 +17,6 @@ pip install flash-attn==2.6.3 --no-build-isolation &&
 pip install -r requirements.txt &&
 python -m nltk.downloader punkt && 
 pip install -e . &&
-
 pip install wandb huggingface-hub
 ```
 
