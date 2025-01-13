@@ -30,6 +30,7 @@ export TRITON_CACHE_DIR="/tmp/triton/autotune"
 
 ```
 # 0.3 Clone these files and move to relative dictionary
+- Useful files are all in [Tulu_Test/Mask](Tulu_Test/Mask)  and [Tulu_Test/qlora](Tulu_Test/qlora)
 ```
 cd .. &
 git clone https://github.com/WenW186079/Tulu_Test.git &&
