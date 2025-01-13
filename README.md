@@ -92,7 +92,7 @@ sh Mask/dpo_train_mask.sh 2 Mask/8b_dpo_mask.yaml
 sh qlora/dpo_train_with_qlora.sh 2 qlora/8b_dpo_qlora.yaml
 ```
 
-👉🏻 With QLORA version-DPO
+👉🏻 With LORA version-DPO
 ```
 sh qlora/dpo_train_with_Lora.sh 2 qlora/8b_dpo_Lora.yaml
 ```
