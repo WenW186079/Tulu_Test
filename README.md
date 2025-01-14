@@ -2,7 +2,7 @@
 
 # 0.0 Set an environment
 ```
-python -m venv tulu_env &&
+python3.10  -m venv tulu_env &&
 source tulu_env/bin/activate
 ```
 
