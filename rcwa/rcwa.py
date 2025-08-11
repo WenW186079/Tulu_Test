@@ -1211,3 +1211,94 @@ def simulate_one(sim_instance: "SimInstance") -> "SimResult":
     )
 
     return result.get_result_using_config(sim_instance.sim_config)
+
+
+
+=============
+import os
+import glob
+import pickle
+import numpy as np
+from metabox import rcwa, modeling
+
+def _load_lib(path):
+    # 如果 modeling 里有 load 函数你也可以用：modeling.load_simulation_library(path)
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+def _check_same(a, b, name):
+    if a != b:
+        raise ValueError(f"{name} 不一致：{a} vs {b}")
+
+def _check_array_close(a, b, name):
+    if not (np.array(a).shape == np.array(b).shape and np.allclose(a, b)):
+        raise ValueError(f"{name} 不一致。")
+
+def merge_pkls(pkl_paths, out_path):
+    if len(pkl_paths) == 0:
+        raise ValueError("没有找到要合并的 .pkl 文件")
+    libs = [_load_lib(p) for p in pkl_paths]
+
+    # 以第一个为基准做一致性检查
+    base = libs[0]
+    for i, lib in enumerate(libs[1:], start=2):
+        _check_same(lib.sim_config.xy_harmonics, base.sim_config.xy_harmonics, "xy_harmonics")
+        _check_same(lib.sim_config.resolution, base.sim_config.resolution, "resolution")
+        _check_array_close(lib.incidence.wavelength, base.incidence.wavelength, "wavelength")
+        _check_array_close(lib.incidence.theta, base.incidence.theta, "theta")
+        _check_array_close(lib.incidence.phi, base.incidence.phi, "phi")
+        _check_array_close(lib.incidence.jones_vector, base.incidence.jones_vector, "jones_vector")
+        # 也可以根据需要检查 unit_cell 的 periodicity/layers 等
+
+    # 合并 feature_values（按样本维度 axis=1）
+    feat_list = [np.array(lib.feature_values) for lib in libs]
+    all_features = np.concatenate(feat_list, axis=1)
+
+    # 合并 simulation_output
+    sim_results = [lib.simulation_output for lib in libs]
+    merged_result = rcwa.combine_sim_results(sim_results)
+
+    merged_lib = modeling.SimulationLibrary(
+        protocell=base.protocell,
+        incidence=base.incidence,
+        sim_config=base.sim_config,
+        feature_values=all_features,
+        simulation_output=merged_result,
+    )
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    modeling.save_simulation_library(merged_lib, name=os.path.splitext(os.path.basename(out_path))[0],
+                                     path=os.path.dirname(out_path), overwrite=True)
+    print(f"✅ 合并完成，已保存：{out_path}")
+
+if __name__ == "__main__":
+    # 用法示例：python merge_rcwa_pkls.py
+    # 你也可以自己改成 argparse，下面是简单示例：
+    folder = "./rcwa_dataset"
+    pkls = sorted(glob.glob(os.path.join(folder, "*.pkl")))
+    merge_pkls(pkls, os.path.join(folder, "merged.pkl"))
+
+-------
+import os
+import glob
+import pandas as pd
+
+def merge_csvs(csv_paths, out_csv):
+    if not csv_paths:
+        raise ValueError("没有找到要合并的 CSV 文件")
+    dfs = [pd.read_csv(p) for p in csv_paths]
+    df = pd.concat(dfs, axis=0, ignore_index=True)
+
+    # 可选：去重（按波长+柱宽去重）
+    if "wavelength (m)" in df.columns and "pillar width (m)" in df.columns:
+        df = df.drop_duplicates(subset=["wavelength (m)", "pillar width (m)"])
+
+    os.makedirs(os.path.dirname(out_csv), exist_ok=True)
+    df.to_csv(out_csv, index=False)
+    print(f"✅ 合并完成，已保存：{out_csv}，共 {len(df)} 行")
+
+if __name__ == "__main__":
+    folder = "./rcwa_dataset"
+    csvs = sorted(glob.glob(os.path.join(folder, "*.csv")))
+    merge_csvs(csvs, os.path.join(folder, "merged.csv"))
+
