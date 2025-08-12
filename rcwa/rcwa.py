@@ -1,3 +1,185 @@
+import numpy as np
+
+# ---------- 通用检查工具 ----------
+def _is_array_like(x):
+    return isinstance(x, (list, tuple, np.ndarray))
+
+def _as_array(x):
+    return np.asarray(x) if not isinstance(x, np.ndarray) else x
+
+def _close(a, b, rtol=1e-7, atol=1e-12):
+    try:
+        return np.allclose(_as_array(a), _as_array(b), rtol=rtol, atol=atol, equal_nan=True)
+    except Exception:
+        return False
+
+def _deep_compare(a, b, path="", diffs=None, float_close=True):
+    """
+    递归比较 a 与 b，将不一致项写入 diffs；返回是否一致。
+    - 标量：用 ==；浮点/数组：用 allclose；
+    - 序列/数组：逐元素比较；
+    - 对象：比较其 __dict__ 中公共键。
+    """
+    if diffs is None:
+        diffs = []
+
+    # 同为 None
+    if a is None and b is None:
+        return True
+
+    # 类型不同，但都可当 array-like 处理的，交给 allclose
+    if _is_array_like(a) and _is_array_like(b):
+        aa, bb = _as_array(a), _as_array(b)
+        if aa.shape != bb.shape:
+            diffs.append(f"{path}: shape {aa.shape} != {bb.shape}")
+            return False
+        if float_close:
+            ok = _close(aa, bb)
+        else:
+            ok = np.array_equal(aa, bb)
+        if not ok:
+            diffs.append(f"{path}: values differ")
+        return ok
+
+    # 简单标量
+    scalar_types = (int, float, str, bool, np.number)
+    if isinstance(a, scalar_types) and isinstance(b, scalar_types):
+        if isinstance(a, (float, np.floating)) or isinstance(b, (float, np.floating)):
+            ok = (abs(float(a) - float(b)) <= 1e-12) if not float_close else (abs(float(a) - float(b)) <= 1e-8)
+        else:
+            ok = (a == b)
+        if not ok:
+            diffs.append(f"{path}: {a} != {b}")
+        return ok
+
+    # 对象：比对公共字段
+    if hasattr(a, "__dict__") and hasattr(b, "__dict__"):
+        keys = set(a.__dict__.keys()) & set(b.__dict__.keys())
+        all_ok = True
+        for k in sorted(keys):
+            # 路径名
+            subp = f"{path}.{k}" if path else k
+            all_ok &= _deep_compare(getattr(a, k), getattr(b, k), subp, diffs, float_close=float_close)
+        return all_ok
+
+    # 其它不可比较类型，直接用 ==
+    ok = (a == b)
+    if not ok:
+        diffs.append(f"{path}: objects differ (fallback)")
+    return ok
+
+# ---------- 有针对性的关键字段检查（优先保障这些字段一致） ----------
+KEY_PATHS = [
+    "sim_config.xy_harmonics",
+    "sim_config.resolution",
+    "incidence.wavelength",
+    "incidence.theta",
+    "incidence.phi",
+    "incidence.jones_vector",
+    # 如有需要可加:
+    # "unit_cell.periodicity",
+    # "unit_cell.layers",
+]
+
+def _get_attr_path(obj, path):
+    cur = obj
+    for part in path.split("."):
+        cur = getattr(cur, getattr(cur, part, None) and part or part)
+        cur = getattr(cur, part)
+    return cur
+
+def _check_key_paths(lib, base, diffs):
+    ok_all = True
+    for p in KEY_PATHS:
+        try:
+            a = _get_attr_path(lib, p)
+            b = _get_attr_path(base, p)
+        except Exception as e:
+            diffs.append(f"{p}: attribute missing ({e})")
+            ok_all = False
+            continue
+        ok = _deep_compare(a, b, path=p, diffs=diffs, float_close=True)
+        ok_all &= ok
+    return ok_all
+
+# ---------- 主函数 ----------
+def merge_pkls(pkl_paths, out_path=None, allow_auto_merge=True):
+    """
+    自动检查每个库的关键字段与整体结构是否一致；一致则合并：
+    - feature_values: 按样本维度（axis=1）拼接
+    - simulation_output: 通过 rcwa.combine_sim_results 合并
+    返回 merged_lib（也可选择保存到 out_path）
+    """
+    if len(pkl_paths) == 0:
+        raise ValueError("没有找到要合并的 .pkl 文件")
+
+    libs = [_load_lib(p) for p in pkl_paths]
+    base = libs[0]
+
+    # 1) 先跑关键字段白名单检查
+    diffs = []
+    for idx, lib in enumerate(libs[1:], start=2):
+        _check_key_paths(lib, base, diffs)
+
+    # 2) 可选：再做一次“宽松的全对象结构对比”（只对公共字段做近似判断）
+    # 避免过度严格，默认 allow_auto_merge=True 时只报告，不阻断
+    wide_diffs = []
+    for idx, lib in enumerate(libs[1:], start=2):
+        _deep_compare(lib.sim_config, base.sim_config, path=f"[lib{idx}].sim_config", diffs=wide_diffs)
+        _deep_compare(lib.incidence,  base.incidence,  path=f"[lib{idx}].incidence",  diffs=wide_diffs)
+        # 如需也比较 unit_cell：
+        # _deep_compare(lib.unit_cell,  base.unit_cell,  path=f"[lib{idx}].unit_cell",  diffs=wide_diffs)
+
+    # 汇总差异
+    all_diffs = diffs + wide_diffs
+    if all_diffs:
+        msg = "检测到以下不一致：\n" + "\n".join(f"- {d}" for d in all_diffs)
+        if not allow_auto_merge:
+            raise ValueError(msg)
+        else:
+            # 自动合并允许时，打印告警但继续（你也可以改成 logger.warning）
+            print("[警告] 存在不一致，但已按 allow_auto_merge=True 继续合并：")
+            print(msg)
+
+    # 3) 合并 feature_values（要求样本维度为 axis=1）
+    feat_list = []
+    for i, lib in enumerate(libs, start=1):
+        fv = np.array(lib.feature_values)
+        feat_list.append(fv)
+
+    # 形状检查：axis=0必须一致
+    base_shape = feat_list[0].shape
+    for i, fv in enumerate(feat_list, start=1):
+        if len(fv.shape) != len(base_shape):
+            raise ValueError(f"feature_values 维度不一致：lib{i} {fv.shape} vs base {base_shape}")
+        # 样本轴是 axis=1，非样本轴需要对齐
+        for ax in range(len(base_shape)):
+            if ax == 1:  # 允许在样本轴合并
+                continue
+            if fv.shape[ax] != base_shape[ax]:
+                raise ValueError(f"feature_values 在轴 {ax} 尺寸不一致：lib{i} {fv.shape} vs base {base_shape}")
+
+    all_features = np.concatenate(feat_list, axis=1)
+
+    # 4) 合并 simulation_output（用你已有的工具）
+    sim_results = [lib.simulation_output for lib in libs]
+    merged_result = rcwa.combine_sim_results(sim_results)
+
+    # 5) 组装新库
+    merged_lib = modeling.SimulationLibrary(
+        protocell=base.protocell,
+        incidence=base.incidence,
+        sim_config=base.sim_config,
+        feature_values=all_features,
+        simulation_output=merged_result,
+    )
+
+    # 6) 可选保存
+    if out_path is not None:
+        _save_lib(merged_lib, out_path)
+
+    return merged_lib
+
 import pandas as pd
 import matplotlib.pyplot as plt
 
