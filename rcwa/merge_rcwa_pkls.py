@@ -1,3 +1,10 @@
+# 只看报告（不保存合并文件）
+python merge_rcwa_pkls.py runs/*.pkl --report-only
+
+# 合并并另存为 pkl，同时导出 CSV
+python merge_rcwa_pkls.py a.pkl b.pkl c.pkl --out-pkl merged.pkl --out-csv merged.csv
+
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
