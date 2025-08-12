@@ -1,3 +1,21 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def plot_wl_vs_n(csv_path):
+    df = pd.read_csv(csv_path)
+    df.columns = [col.strip().lower() for col in df.columns]  # 统一列名
+    if 'wl' not in df.columns or 'n' not in df.columns:
+        raise ValueError("CSV 文件中必须包含 'wl' 和 'n' 列")
+    
+    plt.figure(figsize=(6,4))
+    plt.plot(df['wl'], df['n'], marker='o', linestyle='-')
+    plt.xlabel("Wavelength (μm)")
+    plt.ylabel("Refractive Index (n)")
+    plt.title("Material Dispersion (n vs wl)")
+    plt.grid(True)
+    plt.show()
+
+
 # import os, csv, tqdm, copy, dataclasses, gc, warnings, logging, glob
 
 import os, csv, copy, dataclasses, gc, warnings, logging, glob, time  # #######
