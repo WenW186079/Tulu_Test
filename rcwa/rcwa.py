@@ -1,208 +1,5 @@
-import numpy as np
-
-# ---------- 通用检查工具 ----------
-def _is_array_like(x):
-    return isinstance(x, (list, tuple, np.ndarray))
-
-def _as_array(x):
-    return np.asarray(x) if not isinstance(x, np.ndarray) else x
-
-def _close(a, b, rtol=1e-7, atol=1e-12):
-    try:
-        return np.allclose(_as_array(a), _as_array(b), rtol=rtol, atol=atol, equal_nan=True)
-    except Exception:
-        return False
-
-def _deep_compare(a, b, path="", diffs=None, float_close=True):
-    """
-    递归比较 a 与 b，将不一致项写入 diffs；返回是否一致。
-    - 标量：用 ==；浮点/数组：用 allclose；
-    - 序列/数组：逐元素比较；
-    - 对象：比较其 __dict__ 中公共键。
-    """
-    if diffs is None:
-        diffs = []
-
-    # 同为 None
-    if a is None and b is None:
-        return True
-
-    # 类型不同，但都可当 array-like 处理的，交给 allclose
-    if _is_array_like(a) and _is_array_like(b):
-        aa, bb = _as_array(a), _as_array(b)
-        if aa.shape != bb.shape:
-            diffs.append(f"{path}: shape {aa.shape} != {bb.shape}")
-            return False
-        if float_close:
-            ok = _close(aa, bb)
-        else:
-            ok = np.array_equal(aa, bb)
-        if not ok:
-            diffs.append(f"{path}: values differ")
-        return ok
-
-    # 简单标量
-    scalar_types = (int, float, str, bool, np.number)
-    if isinstance(a, scalar_types) and isinstance(b, scalar_types):
-        if isinstance(a, (float, np.floating)) or isinstance(b, (float, np.floating)):
-            ok = (abs(float(a) - float(b)) <= 1e-12) if not float_close else (abs(float(a) - float(b)) <= 1e-8)
-        else:
-            ok = (a == b)
-        if not ok:
-            diffs.append(f"{path}: {a} != {b}")
-        return ok
-
-    # 对象：比对公共字段
-    if hasattr(a, "__dict__") and hasattr(b, "__dict__"):
-        keys = set(a.__dict__.keys()) & set(b.__dict__.keys())
-        all_ok = True
-        for k in sorted(keys):
-            # 路径名
-            subp = f"{path}.{k}" if path else k
-            all_ok &= _deep_compare(getattr(a, k), getattr(b, k), subp, diffs, float_close=float_close)
-        return all_ok
-
-    # 其它不可比较类型，直接用 ==
-    ok = (a == b)
-    if not ok:
-        diffs.append(f"{path}: objects differ (fallback)")
-    return ok
-
-# ---------- 有针对性的关键字段检查（优先保障这些字段一致） ----------
-KEY_PATHS = [
-    "sim_config.xy_harmonics",
-    "sim_config.resolution",
-    "incidence.wavelength",
-    "incidence.theta",
-    "incidence.phi",
-    "incidence.jones_vector",
-    # 如有需要可加:
-    # "unit_cell.periodicity",
-    # "unit_cell.layers",
-]
-
-def _get_attr_path(obj, path):
-    cur = obj
-    for part in path.split("."):
-        cur = getattr(cur, getattr(cur, part, None) and part or part)
-        cur = getattr(cur, part)
-    return cur
-
-def _check_key_paths(lib, base, diffs):
-    ok_all = True
-    for p in KEY_PATHS:
-        try:
-            a = _get_attr_path(lib, p)
-            b = _get_attr_path(base, p)
-        except Exception as e:
-            diffs.append(f"{p}: attribute missing ({e})")
-            ok_all = False
-            continue
-        ok = _deep_compare(a, b, path=p, diffs=diffs, float_close=True)
-        ok_all &= ok
-    return ok_all
-
-# ---------- 主函数 ----------
-def merge_pkls(pkl_paths, out_path=None, allow_auto_merge=True):
-    """
-    自动检查每个库的关键字段与整体结构是否一致；一致则合并：
-    - feature_values: 按样本维度（axis=1）拼接
-    - simulation_output: 通过 rcwa.combine_sim_results 合并
-    返回 merged_lib（也可选择保存到 out_path）
-    """
-    if len(pkl_paths) == 0:
-        raise ValueError("没有找到要合并的 .pkl 文件")
-
-    libs = [_load_lib(p) for p in pkl_paths]
-    base = libs[0]
-
-    # 1) 先跑关键字段白名单检查
-    diffs = []
-    for idx, lib in enumerate(libs[1:], start=2):
-        _check_key_paths(lib, base, diffs)
-
-    # 2) 可选：再做一次“宽松的全对象结构对比”（只对公共字段做近似判断）
-    # 避免过度严格，默认 allow_auto_merge=True 时只报告，不阻断
-    wide_diffs = []
-    for idx, lib in enumerate(libs[1:], start=2):
-        _deep_compare(lib.sim_config, base.sim_config, path=f"[lib{idx}].sim_config", diffs=wide_diffs)
-        _deep_compare(lib.incidence,  base.incidence,  path=f"[lib{idx}].incidence",  diffs=wide_diffs)
-        # 如需也比较 unit_cell：
-        # _deep_compare(lib.unit_cell,  base.unit_cell,  path=f"[lib{idx}].unit_cell",  diffs=wide_diffs)
-
-    # 汇总差异
-    all_diffs = diffs + wide_diffs
-    if all_diffs:
-        msg = "检测到以下不一致：\n" + "\n".join(f"- {d}" for d in all_diffs)
-        if not allow_auto_merge:
-            raise ValueError(msg)
-        else:
-            # 自动合并允许时，打印告警但继续（你也可以改成 logger.warning）
-            print("[警告] 存在不一致，但已按 allow_auto_merge=True 继续合并：")
-            print(msg)
-
-    # 3) 合并 feature_values（要求样本维度为 axis=1）
-    feat_list = []
-    for i, lib in enumerate(libs, start=1):
-        fv = np.array(lib.feature_values)
-        feat_list.append(fv)
-
-    # 形状检查：axis=0必须一致
-    base_shape = feat_list[0].shape
-    for i, fv in enumerate(feat_list, start=1):
-        if len(fv.shape) != len(base_shape):
-            raise ValueError(f"feature_values 维度不一致：lib{i} {fv.shape} vs base {base_shape}")
-        # 样本轴是 axis=1，非样本轴需要对齐
-        for ax in range(len(base_shape)):
-            if ax == 1:  # 允许在样本轴合并
-                continue
-            if fv.shape[ax] != base_shape[ax]:
-                raise ValueError(f"feature_values 在轴 {ax} 尺寸不一致：lib{i} {fv.shape} vs base {base_shape}")
-
-    all_features = np.concatenate(feat_list, axis=1)
-
-    # 4) 合并 simulation_output（用你已有的工具）
-    sim_results = [lib.simulation_output for lib in libs]
-    merged_result = rcwa.combine_sim_results(sim_results)
-
-    # 5) 组装新库
-    merged_lib = modeling.SimulationLibrary(
-        protocell=base.protocell,
-        incidence=base.incidence,
-        sim_config=base.sim_config,
-        feature_values=all_features,
-        simulation_output=merged_result,
-    )
-
-    # 6) 可选保存
-    if out_path is not None:
-        _save_lib(merged_lib, out_path)
-
-    return merged_lib
-
-import pandas as pd
-import matplotlib.pyplot as plt
-
-def plot_wl_vs_n(csv_path):
-    df = pd.read_csv(csv_path)
-    df.columns = [col.strip().lower() for col in df.columns]  # 统一列名
-    if 'wl' not in df.columns or 'n' not in df.columns:
-        raise ValueError("CSV 文件中必须包含 'wl' 和 'n' 列")
-    
-    plt.figure(figsize=(6,4))
-    plt.plot(df['wl'], df['n'], marker='o', linestyle='-')
-    plt.xlabel("Wavelength (μm)")
-    plt.ylabel("Refractive Index (n)")
-    plt.title("Material Dispersion (n vs wl)")
-    plt.grid(True)
-    plt.show()
-
-
-# import os, csv, tqdm, copy, dataclasses, gc, warnings, logging, glob
-
-import os, csv, copy, dataclasses, gc, warnings, logging, glob, time  # #######
-import sys
-from tqdm.auto import tqdm # ######
+import os, csv, copy, dataclasses, gc, warnings, logging, glob, time 
+from tqdm.auto import tqdm 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 from typing import Any, Dict, List, Tuple, Union
@@ -351,8 +148,15 @@ class Polygon(Shape):
                     "a Material index."
                 )
             value = self.material.index_at(wavelength)
+
+            print('\n==================01 get_shape, value=============\n')
+            print(value)
+            
         else:
             value = self.material
+
+            print('\n==================02 get_shape, value=============\n')
+            print(value)
         return raster.Polygon(value=value, points=self.vertices)
 
     def get_vertices(self):
@@ -393,8 +197,14 @@ class Rectangle(Shape):
                     "a Material index."
                 )
             value = self.material.index_at(wavelength)
+            print('\n==================01 get_shape, value=============\n')
+            print(value)
+
         else:
             value = self.material
+            print('\n==================02 get_shape, value=============\n')
+            print(value)
+
         return raster.Rectangle(
             value=value,
             center=(self.x_pos, self.y_pos),
@@ -901,6 +711,10 @@ class Material:
         else:
             k_value = 0j
 
+        print('\n==================n_value + 1.0j * k_value=============\n')
+        a = n_value + 1.0j * k_value
+        print(a)
+
         return n_value + 1.0j * k_value
 
 
@@ -994,6 +808,8 @@ class SimInstance:
         refl_indices = [
             unit_cell.refl_index for unit_cell in self.unit_cell_array
         ]
+        print('\n==================refl_indices=============\n')
+        print(refl_indices)
         tran_indices = [
             unit_cell.tran_index for unit_cell in self.unit_cell_array
         ]
@@ -1054,15 +870,42 @@ class SimResult:
             The reflected field according to the simulation configuation.
         """
         if config.return_zeroth_order:
+            print('\n==================return_zeroth_order=============')
             rx = self._get_0th(self.rx, self.xy_harmonics)
             ry = self._get_0th(self.ry, self.xy_harmonics)
             rz = self._get_0th(self.rz, self.xy_harmonics)
+            print('\nr5-------------------------')
+            print('\nrx, y, z-------------------------')
+            print('\n')
+            print(rx)
+            print('\n')
+            print(ry)
+            print('\n')
+            print(rz)
         else:
+            print('\n==================return_full_order=============')
             rx, ry, rz = self.rx, self.ry, self.rz
+            print('\nr6-------------------------')
+            print('\nrx, y, z-------------------------')
+            print('\n')
+            print(rx)
+            print('\n')
+            print(ry)
+            print('\n')
+            print(rz)
 
         if config.include_z_comp:
+            print('\n')
+            print('r7-------------------------')
+            print('tf.stack([rx, ry, rz], axis=-1):')
+            print('\n')
+            print(tf.stack([rx, ry, rz], axis=-1))
             return tf.stack([rx, ry, rz], axis=-1)
         else:
+            print('r8-------------------------')
+            print('tf.stack([rx, ry], axis=-1):')
+            print('\n')
+            print(tf.stack([rx, ry], axis=-1))
             return tf.stack([rx, ry], axis=-1)
 
     def trn_field(self, config: SimConfig) -> tf.Tensor:
@@ -1077,13 +920,40 @@ class SimResult:
             tx = self._get_0th(self.tx, self.xy_harmonics)
             ty = self._get_0th(self.ty, self.xy_harmonics)
             tz = self._get_0th(self.tz, self.xy_harmonics)
+            print('\n5-------------------------')
+            print('\ntx, y, z-------------------------')
+            print('\n')
+            print(tx)
+            print('\n')
+            print(ty)
+            print('\n')
+            print(tz)
         else:
             tx, ty, tz = self.tx, self.ty, self.tz
+            print('\n')
+            print('6-------------------------')
+            print('\ntx, y, z-------------------------')
+            print('\n')
+            print(tx)
+            print('\n')
+            print(ty)
+            print('\n')
+            print(tz)
 
         if config.include_z_comp:
+            print('\n')
+            print('7-------------------------')
+            print('tf.stack([tx, ty, tz], axis=-1):')
+            print('\n')
+            print(tf.stack([tx, ty, tz], axis=-1))
             return tf.stack([tx, ty, tz], axis=-1)
         else:
+            print('8-------------------------')
+            print('tf.stack([tx, ty], axis=-1):')
+            print('\n')
+            print(tf.stack([tx, ty], axis=-1))
             return tf.stack([tx, ty], axis=-1)
+        
 
     def get_result_using_config(
         self, config: SimConfig
@@ -1095,12 +965,16 @@ class SimResult:
         Returns:
             The result according to the simulation configuation.
         """
+        # print('4-----------------')
+        # print('\n')
         if not config.return_tensor:
             return self
 
         if config.use_transmission:
+            print('using trn_field')
             return self.trn_field(config)
         else:
+            print('using ref_field')
             return self.ref_field(config)
 
 
@@ -1159,6 +1033,15 @@ def combine_sim_results(
         [sim_result.t_power for sim_result in sim_results], axis=1
     )
     xy_harmonics = sim_results[0].xy_harmonics
+
+    # print('\n')
+    # print('0=======================')
+    # print('tx,y,z,eff,power:')
+    # print(tx)
+    # print(ty)
+    # print(tz)
+    # print(t_eff)
+    # print(t_power)
     return SimResult(
         rx=rx,
         ry=ry,
@@ -1202,7 +1085,7 @@ def simulate_parameterized_unit_cells(
 
     simulate_func = simulate_parameterized_unit_cells_one_batch
 
-    start_time = time.time()######
+    start_time = time.time() ###
 
     if minibatch_size < parameter_tensor.shape[1]:
         # TODO: multi-GPU support
@@ -1211,18 +1094,17 @@ def simulate_parameterized_unit_cells(
             for i in range(0, parameter_tensor.shape[1], minibatch_size)
         ]
         sim_results = []
-        # for parameters_chunk in tqdm.tqdm(parameters_chunks):
 
+        # for parameters_chunk in tqdm.tqdm(parameters_chunks):
         for parameters_chunk in tqdm(
             parameters_chunks,
             desc="Simulating",
             total=len(parameters_chunks),
             unit="batch",
-            disable=False,             # 关键：即使非 TTY 也不禁用
-            dynamic_ncols=True,        # 让宽度自适应
-            file=sys.stdout            # 有些环境只显示 stdout，不显示 stderr
+            disable=False,             
+            dynamic_ncols=True,       
+            file=sys.stdout            
         ): ########
-            
             sim_results.append(
                 simulate_func(
                     parameter_tensor=parameters_chunk,
@@ -1232,30 +1114,22 @@ def simulate_parameterized_unit_cells(
                 )
             )
             gc.collect()
-        total_time = time.time() - start_time ######
-        print(f"\n✅ Simulation completed in {total_time:.2f} seconds.") ########
-
+        total_time = time.time() - start_time ###
+        print(f"\n Simulation completed in {total_time:.2f} seconds.") ###
+    
         return combine_sim_results(sim_results)
-
+    
+    
     result = simulate_func(
         parameter_tensor=parameter_tensor,
         proto_cell=proto_cell,
         incidence=incidence,
         sim_config=sim_config,
     )
-    total_time = time.time() - start_time
-    print(f"\n✅ Simulation completed in {total_time:.2f} seconds.")
+    total_time = time.time() - start_time  ###
+    print(f"\nSimulation completed in {total_time:.2f} seconds.") ###
+    
     return result
-
-    # return simulate_func(
-    #     parameter_tensor=parameter_tensor,
-    #     proto_cell=proto_cell,
-    #     incidence=incidence,
-    #     sim_config=sim_config,
-    # )
-
-
-
 
 def simulate_parameterized_unit_cells_one_batch(
     parameter_tensor: tf.Tensor,
@@ -1279,6 +1153,7 @@ def simulate_parameterized_unit_cells_one_batch(
         incidence=incidence,
         sim_config=sim_config,
     )
+    # print('1--------------------------------')
     return simulate_one(sim_instance)
 
 
@@ -1305,21 +1180,21 @@ def simulate(sim_instance: SimInstance) -> SimResult:
         return simulate_one(sim_instance=sim_instance)
 
 
-# def simulate_batch(sim_instances: List[SimInstance]) -> List[SimResult]:
-#     """Simulates a batch of periodic unit cells using RCWA.
+def simulate_batch(sim_instances: List[SimInstance]) -> List[SimResult]:
+    """Simulates a batch of periodic unit cells using RCWA.
 
-#     Calculates the transmission/reflection coefficients for a batch of unit
-#     cells with a given a list of simulation instances (SimInstance), which
-#     contains the unit cell, incidence, and simulation configuration.
+    Calculates the transmission/reflection coefficients for a batch of unit
+    cells with a given a list of simulation instances (SimInstance), which
+    contains the unit cell, incidence, and simulation configuration.
 
-#     TODO: parallelize this function.
+    TODO: parallelize this function.
 
-#     Args:
-#         sim_instances: list of simulation instances.
-#     Returns:
-#         The list of simulation results.
-#     """
-#     return [simulate_one(sim_instance) for sim_instance in sim_instances]
+    Args:
+        sim_instances: list of simulation instances.
+    Returns:
+        The list of simulation results.
+    """
+    return [simulate_one(sim_instance) for sim_instance in sim_instances]
 
 def simulate_batch(sim_instances: List[SimInstance]) -> List[SimResult]:
     results = []
@@ -1331,7 +1206,7 @@ def simulate_batch(sim_instances: List[SimInstance]) -> List[SimResult]:
 def simulate_one(sim_instance: "SimInstance") -> "SimResult":
     """Simulates the periodic unit cell using RCWA.
 
-    Calculates the transmission/reflection coefficients for a unit cell with a
+    Calculates the transmission/reflection coefficients fr a unit cell witho a
     given a simulation instance (SimInstance), which contains the unit cell,
     incidence, and simulation configuration.
 
@@ -1340,7 +1215,7 @@ def simulate_one(sim_instance: "SimInstance") -> "SimResult":
     Returns:
         The simulation result.
     """
-
+    # print('2--------------------------------')
     incidence_dict = utils.unravel_incidence(sim_instance.incidence)
 
     batched_layer_thicknesses = []
@@ -1362,8 +1237,12 @@ def simulate_one(sim_instance: "SimInstance") -> "SimResult":
     n_cells = len(sim_instance.unit_cell_array)
     batch_size = len(incidence_dict["wavelength"])
     ER_t_arrary = []
+
+
     for unit_cell in sim_instance.unit_cell_array:
         ER_t_wl = []
+
+
         for wavelength in incidence_dict["wavelength"]:
             this_epsilon = unit_cell.get_epsilon(
                 sim_instance.sim_config.resolution,
@@ -1410,379 +1289,25 @@ def simulate_one(sim_instance: "SimInstance") -> "SimResult":
         xy_harmonics=sim_instance.sim_config.xy_harmonics,
     )
 
+    # print('\n3-----------------')
+    # print('\nresult.t_eff')
+    # print(result.t_eff)
+    # print('\n')
+
+    # print('\nt_power')
+    # print(result.t_power)
+    # print('\n')
+
+    # print('\nresult.tx')
+    # print(result.tx)
+    # print('\n')
+
+    # print('\nresult.ty')
+    # print(result.ty)
+    # print('\n')
+
+    # print('\nresult.tz')
+    # print(result.tz)
+    # print('\n')
+
     return result.get_result_using_config(sim_instance.sim_config)
-
-
-
-=============
-import os
-import glob
-import pickle
-import numpy as np
-from metabox import rcwa, modeling
-
-def _load_lib(path):
-    # 如果 modeling 里有 load 函数你也可以用：modeling.load_simulation_library(path)
-    with open(path, "rb") as f:
-        return pickle.load(f)
-
-def _check_same(a, b, name):
-    if a != b:
-        raise ValueError(f"{name} 不一致：{a} vs {b}")
-
-def _check_array_close(a, b, name):
-    if not (np.array(a).shape == np.array(b).shape and np.allclose(a, b)):
-        raise ValueError(f"{name} 不一致。")
-
-def merge_pkls(pkl_paths, out_path):
-    if len(pkl_paths) == 0:
-        raise ValueError("没有找到要合并的 .pkl 文件")
-    libs = [_load_lib(p) for p in pkl_paths]
-
-    # 以第一个为基准做一致性检查
-    base = libs[0]
-    for i, lib in enumerate(libs[1:], start=2):
-        _check_same(lib.sim_config.xy_harmonics, base.sim_config.xy_harmonics, "xy_harmonics")
-        _check_same(lib.sim_config.resolution, base.sim_config.resolution, "resolution")
-        _check_array_close(lib.incidence.wavelength, base.incidence.wavelength, "wavelength")
-        _check_array_close(lib.incidence.theta, base.incidence.theta, "theta")
-        _check_array_close(lib.incidence.phi, base.incidence.phi, "phi")
-        _check_array_close(lib.incidence.jones_vector, base.incidence.jones_vector, "jones_vector")
-        # 也可以根据需要检查 unit_cell 的 periodicity/layers 等
-
-    # 合并 feature_values（按样本维度 axis=1）
-    feat_list = [np.array(lib.feature_values) for lib in libs]
-    all_features = np.concatenate(feat_list, axis=1)
-
-    # 合并 simulation_output
-    sim_results = [lib.simulation_output for lib in libs]
-    merged_result = rcwa.combine_sim_results(sim_results)
-
-    merged_lib = modeling.SimulationLibrary(
-        protocell=base.protocell,
-        incidence=base.incidence,
-        sim_config=base.sim_config,
-        feature_values=all_features,
-        simulation_output=merged_result,
-    )
-
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    modeling.save_simulation_library(merged_lib, name=os.path.splitext(os.path.basename(out_path))[0],
-                                     path=os.path.dirname(out_path), overwrite=True)
-    print(f"✅ 合并完成，已保存：{out_path}")
-
-if __name__ == "__main__":
-    # 用法示例：python merge_rcwa_pkls.py
-    # 你也可以自己改成 argparse，下面是简单示例：
-    folder = "./rcwa_dataset"
-    pkls = sorted(glob.glob(os.path.join(folder, "*.pkl")))
-    merge_pkls(pkls, os.path.join(folder, "merged.pkl"))
-
--------
-import os
-import glob
-import pandas as pd
-
-def merge_csvs(csv_paths, out_csv):
-    if not csv_paths:
-        raise ValueError("没有找到要合并的 CSV 文件")
-    dfs = [pd.read_csv(p) for p in csv_paths]
-    df = pd.concat(dfs, axis=0, ignore_index=True)
-
-    # 可选：去重（按波长+柱宽去重）
-    if "wavelength (m)" in df.columns and "pillar width (m)" in df.columns:
-        df = df.drop_duplicates(subset=["wavelength (m)", "pillar width (m)"])
-
-    os.makedirs(os.path.dirname(out_csv), exist_ok=True)
-    df.to_csv(out_csv, index=False)
-    print(f"✅ 合并完成，已保存：{out_csv}，共 {len(df)} 行")
-
-if __name__ == "__main__":
-    folder = "./rcwa_dataset"
-    csvs = sorted(glob.glob(os.path.join(folder, "*.csv")))
-    merge_csvs(csvs, os.path.join(folder, "merged.csv"))
-
------
-import numpy as np
-import os
-import tensorflow as tf
-from metabox import rcwa, utils, modeling
-import pandas as pd
-import yaml
-import argparse
-import inspect
-
-gpus = tf.config.list_physical_devices('GPU')
-print("GPUs visible to TF:", gpus)
-
-def simulate_rcwa_unit_cell(
-    # path
-    save_model: bool = True,
-    save_dir: str = './rcwa_dataset/',
-    file_name: str = 'samples',
-    csv_file_name: str = 'samples',
-
-    # atom
-    atom_material_name: str = 'Si3N4',
-    pillar_range: tuple = (0, 350e-9),
-    atom_xy_pos: tuple = (0, 0),
-    rotation_deg: int = 0,
-    patterned_layer_thickness: float = 800e-9,
-    use_linear_width: bool = True,
-    num_pillar_width: int = 10,
-    atom_shape: str = 'square',
-
-    # base
-    substrate_material_name: str = 'quartz',
-    substrate_thickness: float = 1000e-9,
-    periodicity: tuple = (350e-9, 350e-9),  # 保留原参数（若不做扫描）
-    # 新增：周期扫描范围与采样数（方阵，x=y=period）
-    periodicity_range: tuple = (350e-9, 450e-9),
-    num_periodicity: int = 5,
-
-    # wavelength
-    wavelength_range: tuple = (460e-9, 700e-9),
-    num_wavelengths: int = 10,
-    wavelength_theta: tuple = (0,),
-    wavelength_phi: tuple = (0,),
-    wavelength_jones_vector: tuple = (1, 0),
-
-    # rcwa
-    harmonics: tuple = (7, 7),
-    resolution: int = 256,
-    minibatch_size: int = 10,
-    overwrite: bool = True,
-    print_result: bool = True,
-    return_tensor: bool = False,
-    save_to_csv: bool = False,
-):
-
-    os.makedirs(save_dir, exist_ok=True)
-
-    # Materials
-    atom_material = rcwa.Material(atom_material_name)
-    substrate_material = rcwa.Material(substrate_material_name)
-
-    # Wavelengths
-    wavelengths = np.linspace(wavelength_range[0], wavelength_range[1], num_wavelengths)
-    incidence = utils.Incidence(
-        wavelength=wavelengths,
-        theta=wavelength_theta,
-        phi=wavelength_phi,
-        jones_vector=wavelength_jones_vector,
-    )
-    print("\nincidence:\n", incidence)
-
-    # RCWA simulation config
-    sim_config = rcwa.SimConfig(
-        xy_harmonics=harmonics,
-        resolution=resolution,
-        minibatch_size=minibatch_size,
-        return_tensor=return_tensor,
-        return_zeroth_order=None,
-        use_transmission=None,
-        include_z_comp=None,
-    )
-
-    # Features
-    width_feat = utils.Feature(
-        vmin=pillar_range[0],
-        vmax=pillar_range[1],
-        name="radius",
-        sampling=num_pillar_width,
-    )
-
-    # 新增：周期 Feature（一个 period 同时给 x/y）
-    period_feat = utils.Feature(
-        vmin=periodicity_range[0],
-        vmax=periodicity_range[1],
-        name="period",
-        sampling=num_periodicity,
-    )
-
-    # Shapes
-    square = rcwa.Rectangle(
-        material=atom_material,
-        x_width=width_feat,
-        y_width=width_feat,
-        x_pos=atom_xy_pos[0],
-        y_pos=atom_xy_pos[1],
-        rotation_deg=rotation_deg,
-    )
-    circle = rcwa.Circle(
-        material=atom_material,
-        radius=width_feat,
-        x_pos=atom_xy_pos[0],
-        y_pos=atom_xy_pos[1],
-    )
-    if atom_shape == 'square':
-        print('Atom shape is square')
-        shapes = [square]
-    elif atom_shape == 'circle':
-        print('Atom shape is circle')
-        shapes = [circle]
-    else:
-        raise ValueError("atom_shape must be 'square' or 'circle'")
-
-    # Layers
-    patterned_layer = rcwa.Layer(material=1, thickness=patterned_layer_thickness, shapes=shapes)
-    substrate_layer = rcwa.Layer(material=substrate_material, thickness=substrate_thickness)
-
-    # Unit cell（注意 periodicity 用 period_feat 绑定到 x,y）
-    unit_cell = rcwa.UnitCell(
-        layers=[patterned_layer, substrate_layer],
-        periodicity=(period_feat, period_feat),
-        refl_index=1.0,
-        tran_index=1.0,
-    )
-    protocell = rcwa.ProtoUnitCell(unit_cell)
-
-    # ---- 生成 (width, period) 的笛卡尔积 ----
-    if use_linear_width:
-        width_vals = np.linspace(pillar_range[0], pillar_range[1], num_pillar_width)
-        print("Using use_linear_width----------------------")
-    else:
-        # 随机宽度
-        rng = np.random.default_rng(42)
-        width_vals = rng.uniform(pillar_range[0], pillar_range[1], size=num_pillar_width)
-        print("Using random width-----------------------")
-
-    period_vals = np.linspace(periodicity_range[0], periodicity_range[1], num_periodicity)
-
-    W, P = np.meshgrid(width_vals, period_vals, indexing='xy')  # W: (num_periodicity, num_pillar_width)
-    widths_flat = W.reshape(-1)     # 长度 = num_pillar_width * num_periodicity
-    periods_flat = P.reshape(-1)
-
-    n_cells = widths_flat.size
-    n_features = len(protocell.features)
-    param_np = np.zeros((n_features, n_cells), dtype=np.float32)
-
-    # 按 protocell.features 的真实顺序写入，避免 set 去重带来的顺序不确定
-    name_to_idx = {f.name: i for i in protocell.features}
-    if "radius" not in name_to_idx or "period" not in name_to_idx:
-        raise RuntimeError(f"Feature names not found in protocell.features: {list(name_to_idx.keys())}")
-
-    param_np[name_to_idx["radius"], :] = widths_flat
-    param_np[name_to_idx["period"], :] = periods_flat
-
-    parameter_tensor = tf.convert_to_tensor(param_np, dtype=tf.float32)
-
-    # 生成所有组合对应的单元
-    unit_cells = protocell.generate_cells_from_parameter_tensor(parameter_tensor)
-
-    sim_instance = rcwa.SimInstance(
-        unit_cell_array=unit_cells,
-        incidence=incidence,
-        sim_config=sim_config
-    )
-
-    sim_result = rcwa.simulate(sim_instance)
-
-    if print_result:
-        print_full_sim_result(sim_result, wavelengths)
-
-    # 保存：feature_values 现在是 (2, num_samples) → [radius_row; period_row]
-    sim_lib = modeling.SimulationLibrary(
-        protocell=protocell,
-        incidence=incidence,
-        sim_config=sim_config,
-        feature_values=parameter_tensor.numpy(),
-        simulation_output=sim_result
-    )
-
-    if save_model:
-        modeling.save_simulation_library(sim_lib, name=file_name, path=save_dir, overwrite=overwrite)
-        print(f"RCWA simulation saved to {os.path.join(save_dir, file_name)}.pkl")
-
-    if save_to_csv:
-        save_path = os.path.join(save_dir, f"{csv_file_name}.csv")
-        save_csv_file(sim_result, save_path, sim_lib)
-
-    return sim_lib
-
-def print_full_sim_result(sim_result: rcwa.SimResult, wavelengths: np.ndarray):
-    print("====================Simulation output for first sample:==================\n")
-
-    def print_tensor(name, tensor):
-        try:
-            val = tensor[0, 0, ...]  # the first wavelength, the first sample
-            print(f"{name}: shape={val.shape}")
-            print(val.numpy())
-        except Exception as e:
-            print(f"{name} printing failed: {e}")
-
-    for attr_name in dir(sim_result):
-        if attr_name.startswith("_"):
-            continue
-        try:
-            tensor = getattr(sim_result, attr_name)
-            if hasattr(tensor, "shape") and hasattr(tensor, "__getitem__"):
-                print_tensor(attr_name, tensor)
-        except Exception as e:
-            print(f"Error accessing attribute {attr_name}: {e}")
-
-    print("\n=================== Done printing=========================")
-
-def save_csv_file(sim_result, save_path="rcwa.csv", sim_lib=None):
-    t_power = getattr(sim_result, "t_power", None)
-    r_power = getattr(sim_result, "r_power", None)
-
-    if t_power is None or r_power is None or sim_lib is None:
-        print("Missing data (t_power, r_power, or sim_lib)")
-        return
-
-    wavelengths = np.array(sim_lib.incidence.wavelength)  # (num_wavelengths,)
-    xy_harmonics = sim_lib.sim_config.xy_harmonics
-
-    # 读取 feature 值与名字
-    feature_values = np.array(sim_lib.feature_values)      # 形状：(n_features, num_samples)
-    if feature_values.ndim == 1:
-        feature_values = feature_values[None, :]
-    feat_names = [f.name for f in sim_lib.protocell.features]
-    name_to_idx = {name: i for i, name in enumerate(feat_names)}
-
-    if "radius" not in name_to_idx or "period" not in name_to_idx:
-        raise RuntimeError(f"CSV saving expects features 'radius' and 'period', got {feat_names}")
-
-    widths = feature_values[name_to_idx["radius"], :]          # (num_samples,)
-    periods = feature_values[name_to_idx["period"], :]         # (num_samples,)
-
-    t_power = t_power.numpy().squeeze()  # 通常为 (num_wavelengths, num_samples)
-    r_power = r_power.numpy().squeeze()
-
-    rows = []
-    # 统一按通用形状处理
-    for i, wl in enumerate(np.atleast_1d(wavelengths)):
-        # 兼容单波长时的形状（变成 1D）
-        t_row = t_power[i] if t_power.ndim == 2 else t_power
-        r_row = r_power[i] if r_power.ndim == 2 else r_power
-        for j in range(widths.shape[0]):
-            rows.append({
-                "wavelength (m)": float(wl),
-                "pillar width (m)": float(widths[j]),
-                "periodicity (m)": float(periods[j]),   # x=y=period
-                "t_power": float(t_row[j]),
-                "r_power": float(r_row[j]),
-                "x_harmonics": xy_harmonics[0],
-                "y_harmonics": xy_harmonics[1],
-            })
-
-    df = pd.DataFrame(rows)
-    df.to_csv(save_path, index=False)
-    print(f"Saved detailed t_power and r_power to {save_path}")
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
-    args = parser.parse_args()
-
-    with open(args.config, 'r') as f:
-        config = yaml.safe_load(f)
-
-    sim_signature = inspect.signature(simulate_rcwa_unit_cell)
-    sim_config = {k: v for k, v in config.items() if k in sim_signature.parameters}
-
-    simulate_rcwa_unit_cell(**sim_config)
-
-if __name__ == "__main__":
-    main()
