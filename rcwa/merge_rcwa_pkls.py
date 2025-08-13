@@ -1,3 +1,48 @@
+#!/usr/bin/env python3
+"""
+inspect_features.py  — 查看 SimulationLibrary 中 protocell.features 的详细信息
+
+Usage:
+  python inspect_features.py --data_dir ./rcwa_dataset --file dataset_name.pkl
+"""
+import os
+import argparse
+from metabox import modeling
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data_dir", type=str, default="./rcwa_dataset", help="目录包含 .pkl 文件")
+    ap.add_argument("--file", type=str, required=True, help=".pkl 文件名（带或不带后缀）")
+    args = ap.parse_args()
+
+    fname = args.file
+    if not fname.endswith(".pkl"):
+        fname += ".pkl"
+    fpath = os.path.join(args.data_dir, fname)
+    if not os.path.exists(fpath):
+        raise FileNotFoundError(f"找不到文件: {fpath}")
+
+    # 加载库
+    lib = modeling.load_simulation_library(os.path.splitext(fname)[0], args.data_dir)
+    features = getattr(lib.protocell, "features", [])
+    print(f"文件: {fname}")
+    print(f"特征数量: {len(features)}")
+    print("=" * 60)
+    for idx, feat in enumerate(features):
+        name = getattr(feat, "name", f"feature_{idx}")
+        vmin = getattr(feat, "vmin", None)
+        vmax = getattr(feat, "vmax", None)
+        print(f"[{idx:02d}] {name:30s}  vmin={vmin!r:>10}  vmax={vmax!r:>10}")
+    print("=" * 60)
+    print("注意: 特征顺序必须在不同数据集中一致，合并时才能直接对齐 feature_values。")
+
+if __name__ == "__main__":
+    main()
+
+python inspect_features.py --data_dir ./rcwa_dataset --file your_dataset.pkl
+
+
+
 # 只看报告（不保存合并文件）
 python merge_rcwa_pkls.py runs/*.pkl --report-only
 
